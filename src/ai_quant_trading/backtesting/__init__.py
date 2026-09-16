@@ -2,8 +2,10 @@
 
 from ai_quant_trading.backtesting.model_backtest import (
     ModelBacktestResult,
+    TransformerHorizonComparison,
     TransformerSignalConfig,
     build_transformer_actions,
+    compare_transformer_horizons,
     filter_history,
     infer_transformer_history,
     list_ppo_backtest_runs,
@@ -19,8 +21,10 @@ from ai_quant_trading.backtesting.model_backtest import (
 
 __all__ = [
     "ModelBacktestResult",
+    "TransformerHorizonComparison",
     "TransformerSignalConfig",
     "build_transformer_actions",
+    "compare_transformer_horizons",
     "filter_history",
     "infer_transformer_history",
     "list_ppo_backtest_runs",

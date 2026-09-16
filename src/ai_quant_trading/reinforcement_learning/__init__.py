@@ -1,10 +1,16 @@
 """Step 9 強化學習 Portfolio Environment 公開介面。"""
 
 from ai_quant_trading.reinforcement_learning.config import (
+    ActionSemantics,
     ExpertKind,
     PortfolioEnvConfig,
     RLSplitConfig,
 )
+from ai_quant_trading.reinforcement_learning.ablation import (
+    SACEnvironmentAblation,
+    build_sac_environment_ablations,
+)
+from ai_quant_trading.reinforcement_learning.actions import map_continuous_action
 from ai_quant_trading.reinforcement_learning.experts import (
     TradingExpertProfile,
     build_expert_profile,
@@ -94,6 +100,7 @@ from ai_quant_trading.reinforcement_learning.registry import (
 )
 
 __all__ = [
+    "ActionSemantics",
     "PortfolioEnvConfig",
     "PreflightFinding",
     "PretrainingReadinessReport",
@@ -114,6 +121,7 @@ __all__ = [
     "RLResearchConfig",
     "RLResearchResult",
     "RLTargetSignal",
+    "SACEnvironmentAblation",
     "SHORT_TERM_RL_FEATURE_COLUMNS",
     "UNIVERSAL_RL_FEATURE_COLUMNS",
     "UniversalPortfolioTradingEnv",
@@ -129,6 +137,7 @@ __all__ = [
     "TradingExpertProfile",
     "build_algorithm_parameters",
     "build_expert_profile",
+    "build_sac_environment_ablations",
     "create_walk_forward_environments",
     "evaluate_rl_model",
     "evaluate_rl_markets",
@@ -144,6 +153,7 @@ __all__ = [
     "latest_rl_target",
     "load_rl_policy",
     "load_model_registry",
+    "map_continuous_action",
     "prepare_rl_dataset",
     "prepare_rl_policy_market_frame",
     "prepare_universal_rl_dataset",

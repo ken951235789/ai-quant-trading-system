@@ -358,6 +358,49 @@ def test_sac_neutral_zone_and_net_risk_reward_reject_weak_entries() -> None:
     assert "insufficient_net_risk_reward" in rejected["risk_reasons"]
 
 
+def test_sac_hold_close_semantics_distinguish_wait_hold_and_close() -> None:
+    env = PortfolioTradingEnv(
+        _perpetual_frame(rows=5),
+        ["feature_a"],
+        _perpetual_config(
+            action_semantics="hold_close_target",
+            hold_action_threshold=0.03,
+            close_action_threshold=0.10,
+        ),
+    )
+    env.reset()
+
+    _, _, _, _, opened = env.step(np.array([1.0], dtype=np.float32))
+    _, _, _, _, held = env.step(np.array([0.0], dtype=np.float32))
+    _, _, _, _, closed = env.step(np.array([0.06], dtype=np.float32))
+
+    assert opened["action_intent"] == "TARGET_LONG"
+    assert held["action_intent"] == "HOLD_POSITION"
+    assert held["side"] == "HOLD"
+    assert held["quantity"] != 0.0
+    assert closed["action_intent"] == "CLOSE_POSITION"
+    assert closed["quantity"] == 0.0
+
+
+def test_sac_hold_close_semantics_waits_when_already_flat() -> None:
+    env = PortfolioTradingEnv(
+        _perpetual_frame(rows=3),
+        ["feature_a"],
+        _perpetual_config(
+            action_semantics="hold_close_target",
+            hold_action_threshold=0.03,
+            close_action_threshold=0.10,
+        ),
+    )
+    env.reset()
+
+    _, _, _, _, info = env.step(np.array([0.0], dtype=np.float32))
+
+    assert info["action_intent"] == "WAIT_FLAT"
+    assert info["side"] == "HOLD"
+    assert info["trade_notional"] == 0.0
+
+
 def test_trade_plan_context_and_take_profit_are_simulated() -> None:
     frame = _perpetual_frame()
     frame.loc[1, "high"] = 102.0

@@ -45,6 +45,9 @@ Walk-forward 回測 -> 模擬倉 -> Testnet -> Live 品質閘門
 - Transformer 與 SAC 透過特徵、期限、Scaler、資料來源及模型中繼資料契約銜接。
 - 原始 OHLCV 不直接作為 AI 輸入，改用報酬、ATR 比例、均線距離及標準化位置等資訊。
 - SAC 使用連續動作表示目標持倉比例，不把「訓練 reward」當成樣本外收益。
+- 新版 SAC 動作契約會區分空手等待、續抱與主動平倉，訓練與執行期共用同一映射。
+- Transformer-only 基準會先扣除來回手續費、滑價與 Spread，並公平比較 5 根與 20 根預測。
+- Transformer cross-fit 只把每折模型未見過的下一段 OOS 預測交給 SAC，資料尾端維持封存。
 - 回測納入 Maker/Taker 手續費、滑價、Spread、Funding、強平與曝險限制。
 - 模型須通過多 seed、Walk-forward、成本壓力測試及封存 final holdout，才可升級為 Champion。
 - 減倉、平倉與緊急停機不會被模型品質閘門阻擋。
@@ -54,6 +57,9 @@ Walk-forward 回測 -> 模擬倉 -> Testnet -> Live 品質閘門
 目前 Transformer 在較長的 20 根預測上曾超越多數類別基準，但 5 根短線預測優勢仍不穩定。正式 SAC 候選在四次樣本外測試均為負，因此沒有升級為 Champion，也沒有開啟 final holdout。
 
 這個結果保留在作品集中，因為研究重點是建立可信的驗證流程，而不是只展示最好的一次回測。數字與限制請見 [研究結果](docs/RESEARCH_RESULTS.md)。
+
+本輪 Transformer-only、SAC 消融與 cross-fit OOS 的設計及操作方式，請見
+[Transformer 與 SAC 三項優化說明](docs/Transformer與SAC三項優化說明.md)。
 
 ## 專案結構
 

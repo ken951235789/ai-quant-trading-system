@@ -38,12 +38,19 @@ def save_rl_environment(
     finbert_scored_news_path: str | Path | None = None,
     finbert_config: dict[str, object] | None = None,
     transformer_provenance: dict[str, object] | None = None,
+    transformer_crossfit_summary: str | Path | None = None,
 ) -> RLArtifactPaths:
     """保存標準化資料、切分、Reward 設定與診斷結果，不執行模型訓練。"""
+    transformer_coverage = float(
+        dataset.availability_coverage.get("transformer_available", 0.0)
+    )
+    uses_transformer = bool(dataset.expected_return_contract) or transformer_coverage > 0
     if transformer_checkpoint is not None and not transformer_provenance:
         raise ValueError("帶 Transformer 的 RL 環境缺少時間隔離來源證明")
-    if transformer_checkpoint is not None and not dataset.expected_return_contract:
+    if uses_transformer and not dataset.expected_return_contract:
         raise ValueError("新 Transformer RL 環境必須明確指定 expected_return_contract，不可猜測預測週期")
+    if uses_transformer and transformer_checkpoint is None and transformer_crossfit_summary is None:
+        raise ValueError("Transformer RL 訓練資料必須提供 checkpoint provenance 或 cross-fit 證明")
     expected_return_available = (
         "expected_return" in dataset.frame
         and pd.to_numeric(dataset.frame["expected_return"], errors="coerce").notna().any()
@@ -70,6 +77,7 @@ def save_rl_environment(
 
     ai_dir = run_dir / "ai"
     transformer_relative_path: str | None = None
+    crossfit_relative_path: str | None = None
     finbert_relative_path: str | None = None
     finbert_runtime_path: str | None = None
     if transformer_checkpoint is not None:
@@ -80,6 +88,21 @@ def save_rl_environment(
         target_checkpoint = ai_dir / "transformer_model.pt"
         shutil.copy2(source_checkpoint, target_checkpoint)
         transformer_relative_path = str(target_checkpoint.relative_to(run_dir))
+    if transformer_crossfit_summary is not None:
+        source_crossfit = Path(transformer_crossfit_summary).resolve()
+        if not source_crossfit.is_file():
+            raise FileNotFoundError(f"找不到 Transformer cross-fit 摘要：{source_crossfit}")
+        crossfit_payload = json.loads(source_crossfit.read_text(encoding="utf-8"))
+        plan = dict(crossfit_payload.get("plan", {}))
+        if (
+            crossfit_payload.get("status") != "complete"
+            or not bool(plan.get("final_holdout_sealed", False))
+        ):
+            raise ValueError("Transformer cross-fit 尚未完成或 final holdout 未封存")
+        ai_dir.mkdir(parents=True, exist_ok=True)
+        target_crossfit = ai_dir / "transformer_crossfit.json"
+        shutil.copy2(source_crossfit, target_crossfit)
+        crossfit_relative_path = str(target_crossfit.relative_to(run_dir))
     if finbert_scored_news_path is not None:
         source_news = Path(finbert_scored_news_path).resolve()
         if not source_news.is_file():
@@ -176,19 +199,20 @@ def save_rl_environment(
         },
         "ai_context": {
             "finbert_enabled": finbert_relative_path is not None,
-            "transformer_enabled": transformer_relative_path is not None,
+            "transformer_enabled": uses_transformer,
             "runtime_ready": (
-                (transformer_checkpoint is None or transformer_relative_path is not None)
+                (not uses_transformer or transformer_relative_path is not None)
                 and (finbert_scored_news_path is None or finbert_relative_path is not None)
             ),
             "finbert_scored_news_path": finbert_relative_path,
             "finbert_runtime_news_path": finbert_runtime_path,
             "finbert_config": finbert_config or {},
             "transformer_checkpoint": transformer_relative_path,
+            "transformer_crossfit_summary": crossfit_relative_path,
             "transformer_provenance": transformer_provenance or {},
             "expected_return_contract": (
                 dataset.expected_return_contract
-                if transformer_relative_path is not None else None
+                if uses_transformer else None
             ),
             "coverage": {
                 "aggregate": {

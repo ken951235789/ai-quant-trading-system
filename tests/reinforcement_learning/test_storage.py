@@ -115,3 +115,48 @@ def test_environment_accepts_transformer_expected_return(tmp_path: Path) -> None
     )
 
     assert paths.run_dir.is_dir()
+
+
+def test_environment_accepts_verified_crossfit_without_runtime_checkpoint(
+    tmp_path: Path,
+) -> None:
+    frame = make_rl_frame()
+    frame["transformer_return_5"] = 0.01
+    frame["transformer_available"] = 1.0
+    frame["transformer_oos"] = 1
+    frame["transformer_oos_fold"] = 1
+    frame.attrs["expected_return_contract"] = {
+        "schema_version": 1,
+        "source_column": "transformer_return_5",
+        "horizon_bars": 5,
+        "units": "fractional_gross_return",
+        "direction": "positive_long_negative_short",
+    }
+    dataset = prepare_rl_dataset(
+        frame,
+        ["feature_a", "feature_b"],
+        RLSplitConfig(min_rows_per_split=10),
+    )
+    summary = tmp_path / "crossfit.json"
+    summary.write_text(
+        json.dumps(
+            {
+                "status": "complete",
+                "plan": {"final_holdout_sealed": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    paths = save_rl_environment(
+        dataset,
+        PortfolioEnvConfig(),
+        tmp_path / "environments",
+        transformer_crossfit_summary=summary,
+    )
+    context = json.loads(paths.metadata_json.read_text(encoding="utf-8"))["ai_context"]
+
+    assert context["transformer_enabled"] is True
+    assert context["runtime_ready"] is False
+    assert context["transformer_crossfit_summary"] == "ai\\transformer_crossfit.json"
+    assert context["expected_return_contract"]["horizon_bars"] == 5

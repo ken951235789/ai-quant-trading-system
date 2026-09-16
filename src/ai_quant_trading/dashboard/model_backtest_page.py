@@ -15,6 +15,7 @@ import streamlit as st
 from ai_quant_trading.backtesting import (
     ModelBacktestResult,
     TransformerSignalConfig,
+    compare_transformer_horizons,
     filter_history,
     infer_transformer_history,
     list_ppo_backtest_runs,
@@ -236,6 +237,9 @@ def _render_result(result: ModelBacktestResult, run_dir: Path, dark_mode: bool) 
         labels = {
             "model_with_costs": "模型（含成本）",
             "model_without_costs": "模型（無成本）",
+            "transformer_with_costs": "Transformer（含成本）",
+            "transformer_without_costs": "Transformer（無成本）",
+            "flat_cash": "空手現金",
             "fixed_ema": "EMA 固定多空",
             "random": "隨機策略",
             "buy_and_hold": "BTC 買入持有",
@@ -478,6 +482,19 @@ def _render_transformer(
         disabled=not allow_short,
         key="bt_tr_max_short",
     )
+    cost_gate = st.columns(4)
+    cost_multiple = cost_gate[0].number_input(
+        "來回成本倍數", 0.0, 10.0, 1.0, 0.25, key="bt_tr_cost_multiple"
+    )
+    minimum_net_return = cost_gate[1].number_input(
+        "最低淨優勢 %", 0.0, 5.0, 0.0, 0.01, key="bt_tr_min_net_return"
+    )
+    exit_threshold_ratio = cost_gate[2].number_input(
+        "續抱門檻比例", 0.0, 1.0, 0.50, 0.05, key="bt_tr_exit_ratio"
+    )
+    minimum_tradeability = cost_gate[3].number_input(
+        "可交易機率門檻", 0.0, 1.0, 0.0, 0.05, key="bt_tr_tradeability"
+    )
     execution = _execution_controls("bt_transformer", {})
     risk = st.columns(4)
     deadband = risk[0].number_input("再平衡死區 %", 0.0, 50.0, 3.0, 0.5, key="bt_tr_deadband")
@@ -531,20 +548,50 @@ def _render_transformer(
             signal_config = TransformerSignalConfig(
                 horizon=int(horizon),
                 minimum_return=float(minimum_return) / 100,
+                minimum_net_return=float(minimum_net_return) / 100,
+                round_trip_cost_multiple=float(cost_multiple),
+                exit_threshold_ratio=float(exit_threshold_ratio),
                 minimum_regime_probability=float(minimum_probability),
+                minimum_tradeability=float(minimum_tradeability),
                 maximum_uncertainty=float(maximum_uncertainty),
                 volatility_multiple=float(volatility_multiple),
                 max_long_fraction=float(max_long) / 100,
                 allow_short=bool(allow_short),
                 max_short_fraction=float(max_short) / 100 if allow_short else 0.0,
             )
-            result = run_transformer_backtest(
-                selected_frame,
-                signal_config,
+            backtest_arguments = {
                 **execution,
-                rebalance_deadband=float(deadband) / 100,
-                maximum_drawdown=float(maximum_drawdown) / 100,
+                "rebalance_deadband": float(deadband) / 100,
+                "maximum_drawdown": float(maximum_drawdown) / 100,
+            }
+            comparison_horizons = tuple(
+                value
+                for value in (5, 20)
+                if f"transformer_return_{value}" in selected_frame
             )
+            if len(comparison_horizons) == 2:
+                comparison = compare_transformer_horizons(
+                    selected_frame,
+                    signal_config,
+                    horizons=comparison_horizons,
+                    **backtest_arguments,
+                )
+                result = comparison.results.get(int(horizon)) or run_transformer_backtest(
+                    selected_frame,
+                    signal_config,
+                    **backtest_arguments,
+                )
+                st.session_state["transformer_horizon_comparison"] = comparison.leaderboard
+                result.metadata["horizon_comparison"] = json.loads(
+                    comparison.leaderboard.to_json(orient="records")
+                )
+            else:
+                result = run_transformer_backtest(
+                    selected_frame,
+                    signal_config,
+                    **backtest_arguments,
+                )
+                st.session_state.pop("transformer_horizon_comparison", None)
             result.metadata.update(
                 {
                     "training_dir": str(selected),
@@ -562,6 +609,17 @@ def _render_transformer(
             st.error(str(exc))
     saved = st.session_state.get("transformer_model_backtest")
     if saved:
+        horizon_comparison = st.session_state.get("transformer_horizon_comparison")
+        if isinstance(horizon_comparison, pd.DataFrame):
+            with st.expander("5 根與 20 根扣成本比較", expanded=True):
+                if split == "test":
+                    st.caption("測試集只用於最終報告；請勿看完此表再回頭挑參數。")
+                themed_dataframe(
+                    horizon_comparison,
+                    hide_index=True,
+                    width="stretch",
+                    key=themed_widget_key("transformer_horizon_comparison"),
+                )
         _render_result(saved[0], saved[1], dark_mode)
 
 

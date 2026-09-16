@@ -8,6 +8,7 @@ from typing import Literal
 
 ExpertKind = Literal["general", "long_term", "short_term"]
 ExecutionMode = Literal["spot", "perpetual"]
+ActionSemantics = Literal["legacy_target", "hold_close_target"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +70,9 @@ class PortfolioEnvConfig:
     include_risk_context: bool = False
     include_trade_plan_context: bool = False
     neutral_action_threshold: float = 0.0
+    action_semantics: ActionSemantics = "legacy_target"
+    hold_action_threshold: float = 0.03
+    close_action_threshold: float = 0.10
     leverage: float = 1.0
     max_leverage: float = 3.0
     max_margin_fraction: float = 1.0
@@ -140,6 +144,10 @@ class PortfolioEnvConfig:
             raise ValueError("execution_mode 只支援 spot 或 perpetual")
         if not 0 <= self.neutral_action_threshold < 1:
             raise ValueError("neutral_action_threshold 必須介於 0（含）與 1（不含）")
+        if self.action_semantics not in {"legacy_target", "hold_close_target"}:
+            raise ValueError("action_semantics 只支援 legacy_target 或 hold_close_target")
+        if not 0 <= self.hold_action_threshold < self.close_action_threshold < 1:
+            raise ValueError("SAC 動作門檻必須符合 0 <= 續抱門檻 < 平倉門檻 < 1")
         if self.leverage <= 0 or self.max_leverage <= 0:
             raise ValueError("leverage 與 max_leverage 必須大於 0")
         if self.leverage > self.max_leverage:

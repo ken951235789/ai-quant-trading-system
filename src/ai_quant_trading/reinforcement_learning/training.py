@@ -346,6 +346,7 @@ def evaluate_rl_model(
     buy_and_hold_return = float(frame.iloc[-1]["close"] / frame.iloc[0]["close"] - 1)
     actions = pd.to_numeric(result["action"], errors="coerce")
     positions = pd.to_numeric(result["position_fraction"], errors="coerce")
+    action_intents = result.get("action_intent", pd.Series("", index=result.index)).astype(str)
     action_tolerance = max(
         (evaluation_config.max_position_fraction + evaluation_config.max_short_fraction) * 0.01,
         1e-4,
@@ -433,6 +434,25 @@ def evaluate_rl_model(
         "short_exposure_ratio": float((positions < -1e-3).mean()),
         "flat_exposure_ratio": float((positions.abs() <= 1e-3).mean()),
         "maximum_effective_leverage": float(positions.abs().max()),
+        "hold_intent_ratio": float(action_intents.eq("HOLD_POSITION").mean()),
+        "wait_flat_intent_ratio": float(action_intents.eq("WAIT_FLAT").mean()),
+        "close_intent_ratio": float(action_intents.eq("CLOSE_POSITION").mean()),
+        "directional_intent_ratio": float(
+            action_intents.isin({"TARGET_LONG", "TARGET_SHORT"}).mean()
+        ),
+        "risk_override_ratio": float(
+            result.get("risk_reasons", pd.Series("", index=result.index))
+            .astype(str)
+            .str.len()
+            .gt(0)
+            .mean()
+        ),
+        "total_reward_turnover_penalty": float(
+            pd.to_numeric(
+                result.get("turnover_penalty", pd.Series(0.0, index=result.index)),
+                errors="coerce",
+            ).sum()
+        ),
     }
     return result, metrics
 
@@ -501,6 +521,20 @@ def evaluate_rl_markets(
         "long_exposure_ratio": float((metric_frame["long_exposure_ratio"] * weights).sum()),
         "short_exposure_ratio": float((metric_frame["short_exposure_ratio"] * weights).sum()),
         "flat_exposure_ratio": float((metric_frame["flat_exposure_ratio"] * weights).sum()),
+        "hold_intent_ratio": float((metric_frame["hold_intent_ratio"] * weights).sum()),
+        "wait_flat_intent_ratio": float(
+            (metric_frame["wait_flat_intent_ratio"] * weights).sum()
+        ),
+        "close_intent_ratio": float((metric_frame["close_intent_ratio"] * weights).sum()),
+        "directional_intent_ratio": float(
+            (metric_frame["directional_intent_ratio"] * weights).sum()
+        ),
+        "risk_override_ratio": float(
+            (metric_frame["risk_override_ratio"] * weights).sum()
+        ),
+        "total_reward_turnover_penalty": float(
+            metric_frame["total_reward_turnover_penalty"].sum()
+        ),
     }
     populated_rows = [frame for frame in all_rows if not frame.empty]
     if populated_rows:

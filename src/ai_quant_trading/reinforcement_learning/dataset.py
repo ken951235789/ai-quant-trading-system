@@ -32,6 +32,8 @@ EXECUTION_CONTEXT_COLUMNS = [
     "expected_return",
     "event_blackout",
     "transformer_available",
+    "transformer_oos",
+    "transformer_oos_fold",
     "finbert_available",
 ]
 

@@ -71,6 +71,10 @@ def build_expert_profile(
             0.10,
         )
     if kind == "short_term":
+        # 淨值報酬已扣真實成本；Reward 只保留小幅換手正則化，避免重複懲罰到空手。
+        turnover_regularization = 0.25 * (
+            fee_rate + slippage_rate + 0.0002 / 2
+        )
         environment = PortfolioEnvConfig(
             initial_capital=initial_capital,
             fee_rate=fee_rate,
@@ -80,13 +84,13 @@ def build_expert_profile(
             max_short_fraction=0.50,
             short_borrow_rate_annual=0.0,
             drawdown_penalty=2.0,
-            turnover_penalty=0.01,
+            turnover_penalty=turnover_regularization,
             max_drawdown_limit=0.10,
             episode_length=2_880,
             random_start=True,
             holding_period_reference=96,
             expert_kind=kind,
-            rebalance_deadband=0.10,
+            rebalance_deadband=0.05,
             minimum_holding_bars=1,
             soft_drawdown_limit=0.06,
             soft_drawdown_multiplier=0.5,
@@ -97,6 +101,9 @@ def build_expert_profile(
             include_risk_context=True,
             include_trade_plan_context=True,
             neutral_action_threshold=0.10,
+            action_semantics="hold_close_target",
+            hold_action_threshold=0.03,
+            close_action_threshold=0.10,
             leverage=2.0,
             max_leverage=3.0,
             max_margin_fraction=0.20,
@@ -112,8 +119,8 @@ def build_expert_profile(
             max_spread_bps=5.0,
             max_slippage_bps=5.0,
             max_atr_fraction=0.05,
-            minimum_gross_target_cost_multiple=4.0,
-            minimum_net_risk_reward=1.5,
+            minimum_gross_target_cost_multiple=1.5,
+            minimum_net_risk_reward=0.75,
             take_profit_distance=0.015,
             initial_capital_randomization=0.10,
             slippage_randomization=0.0001,

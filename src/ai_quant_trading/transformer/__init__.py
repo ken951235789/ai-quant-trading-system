@@ -22,6 +22,16 @@ from ai_quant_trading.transformer.inference import (
     transformer_checkpoint_sequence_length,
     transformer_oos_provenance,
 )
+from ai_quant_trading.transformer.crossfit import (
+    TransformerCrossFitConfig,
+    TransformerCrossFitFold,
+    TransformerCrossFitPlan,
+    TransformerCrossFitResult,
+    assemble_transformer_crossfit_predictions,
+    build_transformer_crossfit_plan,
+    load_transformer_crossfit_predictions,
+    run_transformer_crossfit,
+)
 
 __all__ = [
     "TRANSFORMER_CONTEXT_COLUMNS",
@@ -30,7 +40,14 @@ __all__ = [
     "TransformerBackendStatus",
     "TransformerTrainingResult",
     "TransformerInferenceArtifact",
+    "TransformerCrossFitConfig",
+    "TransformerCrossFitFold",
+    "TransformerCrossFitPlan",
+    "TransformerCrossFitResult",
     "apply_transformer_checkpoint",
+    "assemble_transformer_crossfit_predictions",
+    "build_transformer_crossfit_plan",
+    "load_transformer_crossfit_predictions",
     "infer_latest_transformer_context",
     "infer_transformer_context_frame",
     "transformer_checkpoint_sequence_length",
@@ -38,4 +55,5 @@ __all__ = [
     "ensure_transformer_context",
     "train_temporal_transformer",
     "transformer_backend_status",
+    "run_transformer_crossfit",
 ]

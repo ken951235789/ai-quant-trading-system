@@ -11,6 +11,7 @@ import pandas as pd
 from ai_quant_trading.backtesting import (
     TransformerSignalConfig,
     build_transformer_actions,
+    compare_transformer_horizons,
     filter_history,
     list_ppo_backtest_runs,
     list_transformer_backtest_runs,
@@ -41,6 +42,7 @@ def _transformer_frame(rows: int = 80) -> pd.DataFrame:
             "volume": 10.0,
             "transformer_available": 1.0,
             "transformer_return_5": predicted,
+            "transformer_return_20": predicted * 1.5,
             "transformer_volatility": 0.001,
             "transformer_bull_probability": np.where(predicted > 0, 0.8, 0.1),
             "transformer_bear_probability": np.where(predicted < 0, 0.8, 0.1),
@@ -91,6 +93,45 @@ def test_transformer_backtest_uses_next_open_and_writes_latest(tmp_path: Path) -
         json.loads((output / "summary.json").read_text(encoding="utf-8"))["model_kind"]
         == "transformer"
     )
+
+
+def test_transformer_cost_gate_rejects_signal_that_cannot_cover_round_trip_cost() -> None:
+    result = run_transformer_backtest(
+        _transformer_frame(),
+        TransformerSignalConfig(
+            horizon=5,
+            minimum_return=0.0005,
+            round_trip_cost_multiple=1.0,
+        ),
+        initial_capital=1000,
+        fee_rate=0.001,
+        slippage_rate=0.0005,
+        short_borrow_rate_annual=0.0,
+        rebalance_deadband=0.0,
+        maximum_drawdown=0.5,
+    )
+
+    assert result.metrics["trades"] == 0
+    assert result.metrics["signal_coverage"] == 0.0
+    assert "transformer_without_costs" in result.metadata["benchmarks"]
+
+
+def test_transformer_horizon_comparison_uses_same_cost_model() -> None:
+    comparison = compare_transformer_horizons(
+        _transformer_frame(120),
+        TransformerSignalConfig(minimum_return=0.0001, round_trip_cost_multiple=0.0),
+        horizons=(5, 20),
+        initial_capital=1000,
+        fee_rate=0.0004,
+        slippage_rate=0.0002,
+        short_borrow_rate_annual=0.0,
+        rebalance_deadband=0.01,
+        maximum_drawdown=0.5,
+    )
+
+    assert set(comparison.results) == {5, 20}
+    assert set(comparison.leaderboard["horizon"]) == {5, 20}
+    assert "cost_drag" in comparison.leaderboard
 
 
 def test_split_and_date_filter_are_time_ordered() -> None:

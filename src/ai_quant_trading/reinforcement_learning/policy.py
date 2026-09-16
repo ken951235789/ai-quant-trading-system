@@ -15,6 +15,7 @@ from ai_quant_trading.features.builder import infer_annualization_periods
 from ai_quant_trading.market_clock import completed_bars_only
 from ai_quant_trading.operations.integrity import verify_artifact_manifest
 from ai_quant_trading.reinforcement_learning.config import PortfolioEnvConfig
+from ai_quant_trading.reinforcement_learning.actions import map_continuous_action
 from ai_quant_trading.reinforcement_learning.feature_contract import (
     attach_expected_return,
     resolve_expected_return_contract,
@@ -423,16 +424,12 @@ def latest_rl_target(
             2: (-policy.env_config.max_short_fraction if policy.env_config.allow_short else 0.0),
             3: 0.0,
         }.get(discrete, 0.0)
-    elif policy.env_config.normalized_action_space:
-        if abs(action_value) <= policy.env_config.neutral_action_threshold:
-            action_value = 0.0
-        target = (
-            action_value * policy.env_config.max_position_fraction
-            if action_value >= 0
-            else action_value * policy.env_config.max_short_fraction
-        )
     else:
-        target = action_value
+        target, _ = map_continuous_action(
+            action_value,
+            policy.env_config,
+            current_position=float(position_ratio),
+        )
     row = prepared.iloc[-1]
     if not np.isfinite(target):
         target = 0.0

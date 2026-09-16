@@ -237,6 +237,32 @@ def assess_pretraining_readiness(
         findings.append(
             PreflightFinding("warning", "cost.spread", "永續合約尚未設定 Bid-Ask Spread 成本")
         )
+    estimated_one_way_cost = (
+        env_config.fee_rate + env_config.slippage_rate + env_config.spread_rate / 2
+    )
+    if (
+        env_config.turnover_penalty > 0
+        and env_config.turnover_penalty > estimated_one_way_cost
+    ):
+        findings.append(
+            PreflightFinding(
+                "warning",
+                "reward.turnover",
+                "Reward 額外換手懲罰高於估計單邊執行成本，可能讓 SAC 過度空手",
+            )
+        )
+    if (
+        env_config.expert_kind == "short_term"
+        and env_config.normalized_action_space
+        and env_config.action_semantics == "legacy_target"
+    ):
+        findings.append(
+            PreflightFinding(
+                "warning",
+                "action.neutral_semantics",
+                "短線 SAC 仍把中性動作解讀成空倉，無法區分續抱與主動平倉",
+            )
+        )
     if env_config.max_leverage > 3:
         findings.append(
             PreflightFinding("warning", "risk.leverage", "研究階段最大槓桿高於 3x")
@@ -260,6 +286,25 @@ def assess_pretraining_readiness(
                     "warning" if total_rows < minimum_formal_rows else "error",
                     "ai.transformer",
                     f"Transformer 歷史覆蓋只有 {coverage:.2%}",
+                )
+            )
+        crossfit_marked = all(
+            "transformer_oos" in frame
+            and pd.to_numeric(frame["transformer_oos"], errors="coerce")
+            .fillna(0.0)
+            .eq(1.0)
+            .all()
+            for markets in split_frames.values()
+            for frame in markets.values()
+        )
+        provenance_text = str(ai_context.get("transformer_provenance", "")).lower()
+        if not crossfit_marked and "crossfit" not in provenance_text:
+            findings.append(
+                PreflightFinding(
+                    "warning",
+                    "ai.transformer_crossfit",
+                    "Transformer 雖為樣本外資料，但尚未標示 rolling／expanding cross-fit；"
+                    "SAC 可用歷史通常會較短",
                 )
             )
     if bool(ai_context.get("finbert_enabled", False)):

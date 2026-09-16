@@ -1006,7 +1006,8 @@ def prepare_universal_rl_dataset(
         required = [*MARKET_COLUMNS, *selected_features]
         required.extend(column for column in (
             "expected_return", "funding_rate", "spread_bps", "event_blackout",
-            "transformer_available", "finbert_available",
+            "transformer_available", "transformer_oos", "transformer_oos_fold",
+            "finbert_available",
         ) if column in result and column not in required)
         if contract and str(contract["source_column"]) in result:
             required.append(str(contract["source_column"]))
@@ -1076,17 +1077,32 @@ def save_universal_rl_environment(
     finbert_scored_news_path: str | Path | None = None,
     finbert_config: dict[str, object] | None = None,
     transformer_provenance: dict[str, object] | None = None,
+    transformer_crossfit_summary: str | Path | None = None,
 ) -> UniversalRLArtifactPaths:
     """保存通用環境，每個市場保留獨立 train／validation／test。"""
+    uses_transformer = bool(
+        dataset.use_transformer
+        and any(
+            float(coverage.get("transformer", 0.0)) > 0
+            for coverage in dataset.ai_coverage.values()
+        )
+    )
     if transformer_checkpoint is not None and not transformer_provenance:
         raise ValueError("帶 Transformer 的通用 RL 環境缺少時間隔離來源證明")
-    if transformer_checkpoint is not None and not dataset.expected_return_contract:
+    if uses_transformer and not dataset.expected_return_contract:
         raise ValueError("新 Transformer RL 環境必須明確指定 expected_return_contract，不可猜測預測週期")
+    if (
+        uses_transformer
+        and transformer_checkpoint is None
+        and transformer_crossfit_summary is None
+    ):
+        raise ValueError("Transformer RL 訓練資料必須提供 checkpoint provenance 或 cross-fit 證明")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     run_dir = Path(output_dir).resolve() / f"{stamp}_universal_{len(dataset.markets)}markets"
     markets_dir = run_dir / "markets"
     markets_dir.mkdir(parents=True, exist_ok=False)
     transformer_relative_path: str | None = None
+    crossfit_relative_path: str | None = None
     if transformer_checkpoint is not None:
         source_checkpoint = Path(transformer_checkpoint).resolve()
         if not source_checkpoint.is_file():
@@ -1096,6 +1112,22 @@ def save_universal_rl_environment(
         bundled_checkpoint = ai_dir / "transformer_model.pt"
         shutil.copy2(source_checkpoint, bundled_checkpoint)
         transformer_relative_path = "ai/transformer_model.pt"
+    if transformer_crossfit_summary is not None:
+        source_crossfit = Path(transformer_crossfit_summary).resolve()
+        if not source_crossfit.is_file():
+            raise FileNotFoundError(f"找不到 Transformer cross-fit 摘要：{source_crossfit}")
+        crossfit_payload = json.loads(source_crossfit.read_text(encoding="utf-8"))
+        plan = dict(crossfit_payload.get("plan", {}))
+        if (
+            crossfit_payload.get("status") != "complete"
+            or not bool(plan.get("final_holdout_sealed", False))
+        ):
+            raise ValueError("Transformer cross-fit 尚未完成或 final holdout 未封存")
+        ai_dir = run_dir / "ai"
+        ai_dir.mkdir(exist_ok=True)
+        bundled_crossfit = ai_dir / "transformer_crossfit.json"
+        shutil.copy2(source_crossfit, bundled_crossfit)
+        crossfit_relative_path = "ai/transformer_crossfit.json"
     market_payload: dict[str, object] = {}
     totals = {"train": 0, "validation": 0, "test": 0}
     for index, (name, market) in enumerate(dataset.markets.items()):
@@ -1149,7 +1181,7 @@ def save_universal_rl_environment(
         else None
     )
     runtime_ready = bool(
-        (not dataset.use_transformer or transformer_relative_path)
+        (not uses_transformer or transformer_relative_path)
         and (not dataset.use_finbert or finbert_source)
     )
     payload = {
@@ -1193,7 +1225,7 @@ def save_universal_rl_environment(
         },
         "ai_context": {
             "finbert_enabled": dataset.use_finbert,
-            "transformer_enabled": dataset.use_transformer,
+            "transformer_enabled": uses_transformer,
             "multitimeframe_enabled": any(
                 column.startswith("u_mtf_") for column in dataset.feature_columns
             ),
@@ -1207,10 +1239,11 @@ def save_universal_rl_environment(
             "finbert_scored_news_path": finbert_source,
             "finbert_config": finbert_config or {},
             "transformer_checkpoint": transformer_relative_path,
+            "transformer_crossfit_summary": crossfit_relative_path,
             "transformer_provenance": transformer_provenance or {},
             "expected_return_contract": (
                 dataset.expected_return_contract
-                if transformer_relative_path is not None else None
+                if uses_transformer else None
             ),
             "coverage": {
                 "aggregate": aggregate_coverage,

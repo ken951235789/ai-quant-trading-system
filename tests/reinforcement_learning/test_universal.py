@@ -304,3 +304,37 @@ def test_refuses_transformer_environment_without_time_provenance(tmp_path) -> No
             tmp_path / "environments",
             transformer_checkpoint=checkpoint,
         )
+
+
+def test_saves_crossfit_oos_environment_before_runtime_checkpoint_exists(tmp_path) -> None:
+    frames = make_universal_frames()
+    for frame in frames.values():
+        frame["transformer_return_20"] = 0.01
+        frame["transformer_available"] = 1.0
+        frame["transformer_oos"] = 1
+    dataset = prepare_universal_rl_dataset(
+        frames,
+        RLSplitConfig(0.6, 0.2, min_rows_per_split=20),
+    )
+    crossfit = tmp_path / "crossfit.json"
+    crossfit.write_text(
+        json.dumps(
+            {
+                "status": "complete",
+                "plan": {"final_holdout_sealed": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    paths = save_universal_rl_environment(
+        dataset,
+        PortfolioEnvConfig(),
+        tmp_path / "environments",
+        transformer_crossfit_summary=crossfit,
+    )
+    context = json.loads(paths.metadata_json.read_text(encoding="utf-8"))["ai_context"]
+
+    assert context["runtime_ready"] is False
+    assert context["transformer_crossfit_summary"] == "ai/transformer_crossfit.json"
+    assert context["expected_return_contract"]["horizon_bars"] == 20

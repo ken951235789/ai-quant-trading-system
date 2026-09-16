@@ -13,6 +13,7 @@ import pandas as pd
 from ai_quant_trading.features.builder import infer_annualization_periods
 from ai_quant_trading.market_clock import interval_duration
 from ai_quant_trading.reinforcement_learning.config import PortfolioEnvConfig
+from ai_quant_trading.reinforcement_learning.actions import map_continuous_action
 from ai_quant_trading.risk import govern_target_position
 
 
@@ -204,18 +205,25 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
             1 - direction * self._liquidation_distance()
         )
 
-    def _map_action_to_target(self, action_value: float) -> float:
-        short_limit = self.config.max_short_fraction if self.config.allow_short else 0.0
-        if self.config.normalized_action_space:
-            normalized = float(np.clip(action_value, -1.0 if self.config.allow_short else 0.0, 1.0))
-            if abs(normalized) <= self.config.neutral_action_threshold:
-                return 0.0
-            return (
-                normalized * self.config.max_position_fraction
-                if normalized >= 0
-                else normalized * self.config.max_short_fraction
-            )
-        return float(np.clip(action_value, -short_limit, self.config.max_position_fraction))
+    def _map_action_to_target(
+        self,
+        action_value: float,
+        current_position: float = 0.0,
+    ) -> float:
+        """將 SAC 連續動作轉成目標曝險，並保留舊模型相容性。"""
+        return map_continuous_action(
+            action_value,
+            self.config,
+            current_position=current_position,
+        )[0]
+
+    def _action_intent(self, action_value: float, current_position: float) -> str:
+        """提供診斷用的動作語意，不讓「續抱」再被誤認成「平倉」。"""
+        return map_continuous_action(
+            action_value,
+            self.config,
+            current_position=current_position,
+        )[1]
 
     @staticmethod
     def _increases_risk(target: float, current: float) -> bool:
@@ -520,10 +528,6 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
         self._last_closed_trade_pnl = 0.0
         action_value = float(np.asarray(action, dtype=float).reshape(-1)[0])
         invalid_action = not np.isfinite(action_value)
-        proposed_target_fraction = self._map_action_to_target(
-            0.0 if invalid_action else action_value
-        )
-
         current_row = self.frame.iloc[self._index]
         next_index = self._index + 1
         next_row = self.frame.iloc[next_index]
@@ -536,6 +540,15 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
         next_open = float(next_row["open"])
         equity_at_open = max(self._equity(next_open), 1e-12)
         current_fraction_at_open = self._quantity * next_open / equity_at_open
+        proposed_target_fraction = self._map_action_to_target(
+            0.0 if invalid_action else action_value,
+            current_fraction_at_open,
+        )
+        action_intent = (
+            "INVALID_FLATTEN"
+            if invalid_action
+            else self._action_intent(action_value, current_fraction_at_open)
+        )
         risk_decision = govern_target_position(
             proposed_target=proposed_target_fraction,
             current_position=current_fraction_at_open,
@@ -554,6 +567,16 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
         governed_target = risk_decision.approved_target
         target_fraction = self._risk_cap_target(governed_target, self._index)
         hard_reasons = list(risk_decision.reasons)
+        # 續抱動作不應因點差、資金費率或浮點誤差，每根產生極小的反向調倉。
+        # 若部位實質超出風控上限，差距仍會大於容差並正常減倉。
+        hold_tolerance = max(self.config.rebalance_deadband, 1e-3)
+        if (
+            action_intent == "HOLD_POSITION"
+            and not risk_decision.halted
+            and not risk_decision.reasons
+            and abs(target_fraction - current_fraction_at_open) <= hold_tolerance
+        ):
+            target_fraction = current_fraction_at_open
         if not np.isclose(target_fraction, governed_target):
             hard_reasons.append("risk_position_cap")
         risk_increase = self._increases_risk(target_fraction, current_fraction_at_open)
@@ -835,6 +858,8 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
         info = {
             "timestamp": pd.Timestamp(next_row["timestamp"]).isoformat(),
             "side": side,
+            "action_intent": action_intent,
+            "raw_action": action_value,
             "proposed_target_fraction": proposed_target_fraction,
             "target_fraction": target_fraction,
             "risk_multiplier": risk_decision.risk_multiplier,

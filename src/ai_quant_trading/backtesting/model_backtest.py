@@ -28,7 +28,11 @@ class TransformerSignalConfig:
 
     horizon: int = 5
     minimum_return: float = 0.0003
+    minimum_net_return: float = 0.0
+    round_trip_cost_multiple: float = 1.0
+    exit_threshold_ratio: float = 0.50
     minimum_regime_probability: float = 0.35
+    minimum_tradeability: float = 0.0
     maximum_uncertainty: float = 0.80
     volatility_multiple: float = 1.0
     max_long_fraction: float = 1.0
@@ -40,8 +44,16 @@ class TransformerSignalConfig:
             raise ValueError("預測週期必須大於 0")
         if self.minimum_return < 0:
             raise ValueError("最小預測報酬不可小於 0")
+        if self.minimum_net_return < 0:
+            raise ValueError("最小淨預測報酬不可小於 0")
+        if self.round_trip_cost_multiple < 0:
+            raise ValueError("來回成本倍數不可小於 0")
+        if not 0 <= self.exit_threshold_ratio <= 1:
+            raise ValueError("出場門檻比例必須介於 0 與 1")
         if not 0 <= self.minimum_regime_probability <= 1:
             raise ValueError("行情機率門檻必須介於 0 與 1")
+        if not 0 <= self.minimum_tradeability <= 1:
+            raise ValueError("可交易機率門檻必須介於 0 與 1")
         if not 0 <= self.maximum_uncertainty <= 1:
             raise ValueError("不確定性上限必須介於 0 與 1")
         if self.volatility_multiple <= 0:
@@ -63,6 +75,14 @@ class ModelBacktestResult:
     metrics: dict[str, float | int]
     source_frame: pd.DataFrame
     metadata: dict[str, Any]
+
+
+@dataclass(slots=True)
+class TransformerHorizonComparison:
+    """使用同一資料、成本與撮合規則比較不同預測週期。"""
+
+    results: dict[int, ModelBacktestResult]
+    leaderboard: pd.DataFrame
 
 
 class _ActionSequencePolicy:
@@ -532,8 +552,10 @@ def infer_transformer_history(
 def build_transformer_actions(
     frame: pd.DataFrame,
     config: TransformerSignalConfig,
+    *,
+    estimated_round_trip_cost: float | pd.Series = 0.0,
 ) -> pd.Series:
-    """使用方向、行情機率、不確定性和預測波動率計算目標部位。"""
+    """使用扣成本淨優勢與進出場遲滯計算 Transformer 目標部位。"""
     return_column = f"transformer_return_{config.horizon}"
     required = {
         return_column,
@@ -564,13 +586,38 @@ def build_transformer_actions(
         .clip(0.0, 1.0)
     )
     available = pd.to_numeric(frame["transformer_available"], errors="coerce").fillna(0.0) >= 0.5
+    tradeability_column = f"transformer_tradeability_{config.horizon}"
+    tradeability = (
+        pd.to_numeric(frame[tradeability_column], errors="coerce").fillna(0.0).clip(0.0, 1.0)
+        if tradeability_column in frame
+        else pd.Series(1.0, index=frame.index)
+    )
+    if isinstance(estimated_round_trip_cost, pd.Series):
+        round_trip_cost = (
+            pd.to_numeric(estimated_round_trip_cost.reindex(frame.index), errors="coerce")
+            .fillna(0.0)
+            .clip(lower=0.0)
+        )
+    else:
+        round_trip_cost = pd.Series(
+            max(float(estimated_round_trip_cost), 0.0),
+            index=frame.index,
+        )
     direction = np.sign(predicted_return.to_numpy(dtype=float))
     confidence = np.where(direction >= 0, bull, bear)
-    eligible = (
+    quality_eligible = (
         available.to_numpy()
-        & (predicted_return.abs().to_numpy() >= config.minimum_return)
         & (confidence >= config.minimum_regime_probability)
         & (uncertainty.to_numpy() <= config.maximum_uncertainty)
+        & (tradeability.to_numpy(dtype=float) >= config.minimum_tradeability)
+    )
+    entry_threshold = np.maximum(
+        config.minimum_return,
+        round_trip_cost.to_numpy(dtype=float) * config.round_trip_cost_multiple
+        + config.minimum_net_return,
+    )
+    entry_eligible = quality_eligible & (
+        predicted_return.abs().to_numpy(dtype=float) >= entry_threshold
     )
     risk_unit = np.maximum(
         volatility.to_numpy(dtype=float) * config.volatility_multiple,
@@ -578,15 +625,33 @@ def build_transformer_actions(
     )
     strength = np.clip(predicted_return.abs().to_numpy(dtype=float) / risk_unit, 0.0, 1.0)
     certainty = np.clip(1.0 - uncertainty.to_numpy(dtype=float), 0.0, 1.0)
-    targets = np.where(
+    candidate_targets = np.where(
         direction >= 0,
         config.max_long_fraction * strength * certainty,
         -config.max_short_fraction * strength * certainty,
     )
     if not config.allow_short:
-        targets = np.maximum(targets, 0.0)
+        candidate_targets = np.maximum(candidate_targets, 0.0)
+
+    # 進場要求預測優勢足以覆蓋來回成本；進場後用較低門檻續抱，避免每根重複交易。
+    targets = np.zeros(len(frame), dtype=float)
+    current_target = 0.0
+    predicted_values = predicted_return.to_numpy(dtype=float)
+    exit_threshold = entry_threshold * config.exit_threshold_ratio
+    for index in range(len(frame)):
+        if entry_eligible[index]:
+            current_target = float(candidate_targets[index])
+        elif abs(current_target) > 1e-12:
+            current_direction = 1.0 if current_target > 0 else -1.0
+            still_valid = (
+                quality_eligible[index]
+                and predicted_values[index] * current_direction >= exit_threshold[index]
+            )
+            if not still_valid:
+                current_target = 0.0
+        targets[index] = current_target
     return pd.Series(
-        np.where(eligible, targets, 0.0),
+        targets,
         index=frame.index,
         name="transformer_target_fraction",
     )
@@ -641,7 +706,20 @@ def run_transformer_backtest(
     usable = frame.loc[available >= 0.5].reset_index(drop=True)
     if len(usable) < 2:
         raise ValueError("指定區間沒有足夠的 Transformer 有效預測")
-    actions = build_transformer_actions(usable, signal_config)
+    spread_cost = (
+        pd.to_numeric(usable["spread_bps"], errors="coerce").fillna(0.0).clip(lower=0.0)
+        / 10_000
+        if "spread_bps" in usable
+        else pd.Series(0.0, index=usable.index)
+    )
+    estimated_round_trip_cost = (
+        2 * float(fee_rate) + 2 * float(slippage_rate) + spread_cost
+    )
+    actions = build_transformer_actions(
+        usable,
+        signal_config,
+        estimated_round_trip_cost=estimated_round_trip_cost,
+    )
     env_config = PortfolioEnvConfig(
         initial_capital=float(initial_capital),
         fee_rate=float(fee_rate),
@@ -684,15 +762,116 @@ def run_transformer_backtest(
     evaluation["uncertainty"] = pd.to_numeric(
         decision["transformer_uncertainty"], errors="coerce"
     ).to_numpy()
+    evaluation["estimated_round_trip_cost"] = estimated_round_trip_cost.iloc[
+        :-1
+    ].to_numpy()
+    evaluation["predicted_net_edge"] = (
+        evaluation["predicted_return"].abs()
+        - evaluation["estimated_round_trip_cost"]
+    )
     metrics.update(_transformer_prediction_metrics(usable, actions, signal_config.horizon))
+    no_cost_frame = usable.copy()
+    if "spread_bps" in no_cost_frame:
+        no_cost_frame["spread_bps"] = 0.0
+    no_cost_config = replace(
+        env_config,
+        fee_rate=0.0,
+        slippage_rate=0.0,
+        spread_rate=0.0,
+        short_borrow_rate_annual=0.0,
+    )
+    _, no_cost_metrics = evaluate_rl_model(
+        _ActionSequencePolicy(actions.to_numpy()),
+        no_cost_frame,
+        ["transformer_available"],
+        no_cost_config,
+        deterministic=True,
+        seed=seed,
+    )
+    close = pd.to_numeric(usable["close"], errors="coerce")
+    buy_hold_equity = initial_capital * close / float(close.iloc[0])
+    buy_hold_drawdown = buy_hold_equity / buy_hold_equity.cummax() - 1.0
+    benchmarks = {
+        "transformer_with_costs": _benchmark_metrics(metrics),
+        "transformer_without_costs": _benchmark_metrics(no_cost_metrics),
+        "flat_cash": {
+            "final_equity": float(initial_capital),
+            "total_return": 0.0,
+            "max_drawdown": 0.0,
+            "trades": 0,
+        },
+        "buy_and_hold": {
+            "final_equity": float(buy_hold_equity.iloc[-1]),
+            "total_return": float(close.iloc[-1] / close.iloc[0] - 1.0),
+            "max_drawdown": abs(float(buy_hold_drawdown.min())),
+            "trades": 1,
+        },
+    }
     evaluation = _attach_market_context(evaluation, usable, initial_capital)
     return ModelBacktestResult(
         "transformer",
         evaluation,
         metrics,
         usable,
-        {"signal_config": asdict(signal_config), "execution_config": env_config.to_dict()},
+        {
+            "signal_config": asdict(signal_config),
+            "execution_config": env_config.to_dict(),
+            "benchmarks": benchmarks,
+            "cost_model": {
+                "fee_rate_per_side": float(fee_rate),
+                "slippage_rate_per_side": float(slippage_rate),
+                "spread_source": "spread_bps" if "spread_bps" in usable else "zero",
+                "entry_rule": "abs(predicted_return) >= cost_multiple * round_trip_cost + minimum_net_return",
+            },
+        },
     )
+
+
+def compare_transformer_horizons(
+    frame: pd.DataFrame,
+    signal_config: TransformerSignalConfig,
+    *,
+    horizons: tuple[int, ...] = (5, 20),
+    **backtest_kwargs: Any,
+) -> TransformerHorizonComparison:
+    """在同一段因果資料上公平比較 5 與 20 根等 Transformer 訊號。"""
+    if not horizons or len(set(horizons)) != len(horizons):
+        raise ValueError("比較週期不可為空或重複")
+    results: dict[int, ModelBacktestResult] = {}
+    rows: list[dict[str, float | int]] = []
+    for horizon in horizons:
+        result = run_transformer_backtest(
+            frame,
+            replace(signal_config, horizon=int(horizon)),
+            **backtest_kwargs,
+        )
+        results[int(horizon)] = result
+        with_costs = dict(result.metadata["benchmarks"])["transformer_with_costs"]
+        without_costs = dict(result.metadata["benchmarks"])["transformer_without_costs"]
+        buy_hold = dict(result.metadata["benchmarks"])["buy_and_hold"]
+        rows.append(
+            {
+                "horizon": int(horizon),
+                "total_return": float(result.metrics.get("total_return", 0.0)),
+                "max_drawdown": float(result.metrics.get("max_drawdown", 0.0)),
+                "sharpe_ratio": float(result.metrics.get("sharpe_ratio", 0.0)),
+                "profit_factor": float(result.metrics.get("profit_factor", 0.0)),
+                "trades": int(result.metrics.get("trades", 0)),
+                "signal_coverage": float(result.metrics.get("signal_coverage", 0.0)),
+                "direction_accuracy": float(
+                    result.metrics.get("direction_accuracy", 0.0)
+                ),
+                "cost_drag": float(without_costs.get("total_return", 0.0))
+                - float(with_costs.get("total_return", 0.0)),
+                "excess_over_buy_hold": float(result.metrics.get("total_return", 0.0))
+                - float(buy_hold.get("total_return", 0.0)),
+            }
+        )
+    leaderboard = pd.DataFrame(rows).sort_values(
+        ["total_return", "sharpe_ratio"],
+        ascending=False,
+    ).reset_index(drop=True)
+    return TransformerHorizonComparison(results, leaderboard)
 
 
 def save_latest_model_backtest(

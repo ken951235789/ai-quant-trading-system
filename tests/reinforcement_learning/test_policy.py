@@ -203,6 +203,34 @@ def test_latest_target_adds_trade_plan_context_and_applies_neutral_zone() -> Non
     assert policy.model.last_observation[-1] == pytest.approx(0.015)
 
 
+@pytest.mark.parametrize(
+    ("action", "expected"),
+    [(0.0, 0.25), (0.06, 0.0)],
+)
+def test_runtime_uses_same_sac_hold_close_contract_as_training(
+    action: float,
+    expected: float,
+) -> None:
+    policy = make_policy()
+    policy.model.target = action
+    policy.env_config = PortfolioEnvConfig(
+        holding_period_reference=8,
+        normalized_action_space=True,
+        action_semantics="hold_close_target",
+        hold_action_threshold=0.03,
+        close_action_threshold=0.10,
+    )
+
+    signal = latest_rl_target(
+        make_policy_frame(),
+        policy,
+        cash_ratio=0.75,
+        position_ratio=0.25,
+    )
+
+    assert signal.target_fraction == pytest.approx(expected)
+
+
 def test_runtime_inference_window_keeps_warmup_when_multiple_bars_were_missed() -> None:
     frame = pd.DataFrame(
         {"timestamp": pd.date_range("2026-01-01", periods=400, freq="4h", tz="UTC")}
