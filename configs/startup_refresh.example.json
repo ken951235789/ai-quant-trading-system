@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "refresh_market_data": true,
+  "collect_news": true,
+  "score_finbert": true,
+  "refresh_features": true,
+  "enrich_features_with_finbert": true,
+  "yahoo_news_per_symbol": 10,
+  "news_retention_days": 3650,
+  "news_max_rows": 100000
+}

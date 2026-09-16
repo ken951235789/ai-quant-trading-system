@@ -1,0 +1,85 @@
+# Python 快取
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+build/
+dist/
+
+# 虛擬環境
+.venv/
+venv/
+env/
+
+# 環境變數與密鑰
+.env
+monitoring/secrets/
+.env.*
+!.env.example
+*.key
+*.pem
+
+# 本地資料與大型輸出
+data/raw/*
+data/processed/*
+data/database/*
+data/paper_trading/*
+data/live_trading/*
+data/models/
+data/config/*
+data/research/*
+!data/raw/README.md
+!data/processed/README.md
+!data/database/README.md
+!data/paper_trading/README.md
+!data/live_trading/README.md
+
+# Notebook 快取
+.ipynb_checkpoints/
+
+# 測試與覆蓋率
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# 日誌
+logs/
+*.log
+*.dump
+*.sql.gz
+
+# 公開版本額外防護
+.streamlit/secrets.toml
+secrets.toml
+kaggle.json
+*.pfx
+*.p12
+*.crt
+*.cer
+*.keystore
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.pkl
+*.pickle
+*.joblib
+*.db
+*.sqlite*
+*.duckdb
+*.parquet
+*.feather
+*.arrow
+*.csv
+*.tsv
+*.zip
+*.7z
+*.tar
+*.tar.gz
+artifacts/
+outputs/

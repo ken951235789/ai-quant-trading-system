@@ -1,0 +1,33 @@
+groups:
+  - name: ai-quant-critical
+    rules:
+      - alert: QuantWatchdogDown
+        expr: up{job="ai-quant-watchdog"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "交易 Watchdog 無法連線"}
+      - alert: BinanceUserStreamDown
+        expr: ai_quant_user_stream_up == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Binance 私有事件流中斷"}
+      - alert: ReconciliationMismatch
+        expr: ai_quant_reconciliation_consistent == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "交易所與本機狀態對帳不一致"}
+      - alert: TradingWorkerDown
+        expr: ai_quant_automation_up == 0
+        for: 3m
+        labels: {severity: critical}
+        annotations: {summary: "無人交易 Worker 心跳逾時"}
+      - alert: EmergencyHaltActive
+        expr: ai_quant_emergency_halt_active == 1
+        for: 0m
+        labels: {severity: critical}
+        annotations: {summary: "緊急停機已啟用"}
+      - alert: TradingDiskLow
+        expr: ai_quant_disk_free_bytes < 5368709120
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "交易資料磁碟低於 5 GiB"}

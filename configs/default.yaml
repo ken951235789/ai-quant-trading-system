@@ -1,0 +1,51 @@
+# BTC 15 分鐘永續合約研究設定。
+
+exchange:
+  name: "binance_futures"
+  market_type: "usd_m_perpetual"
+  quote_asset: "USDT"
+
+symbols:
+  - "BTC/USDT"
+
+data:
+  decision_interval: "15m"
+  context_intervals: ["5m", "15m", "1h", "4h", "1d"]
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  train_fraction: 0.60
+  validation_fraction: 0.20
+
+execution:
+  mode: "perpetual"
+  margin_mode: "isolated"
+  leverage: 2.0
+  max_leverage: 3.0
+  fee_rate: 0.0004
+  spread_bps: 2.0
+  slippage_bps: 2.0
+  max_spread_bps: 5.0
+  max_slippage_bps: 5.0
+  next_bar_open: true
+
+risk:
+  risk_per_trade: 0.0025
+  daily_loss_limit: 0.01
+  maximum_drawdown: 0.10
+  maximum_margin_fraction: 0.20
+  maximum_notional_fraction: 0.50
+  maximum_consecutive_losses: 3
+  atr_stop_minimum: 0.004
+  atr_stop_maximum: 0.015
+  drift_minimum_risk_multiplier: 0.25
+  drawdown_curve_exponent: 1.0
+
+paper_trading:
+  account_root: "data/paper_trading"
+  initial_capital: 1000
+
+live_trading:
+  trading_enabled: false
+  futures_gateway_implemented: true
+  user_data_stream_primary: false
+  allowed_symbols: ["BTC/USDT"]

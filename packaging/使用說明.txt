@@ -1,0 +1,53 @@
+AI Quant Trading System Windows 版
+
+啟動方式：
+1. 雙擊 AIQuantTradingSystem.exe。
+2. 等待背景服務完成載入，系統會直接開啟原生桌面視窗。
+3. 不需要另開瀏覽器；內部服務只監聽本機 127.0.0.1。
+4. 啟動後會更新既有 BTC Futures 資料、新聞與特徵，左側可查看狀態。
+
+建議操作順序：
+1. 到「資料中心 → 市場資料」更新 BTC 15m 多週期資料包。
+2. 到「特徵資料」建立 5m、15m、1h、4h、1d 的因果多週期資料集。
+3. 到「模型中心 → Transformer」訓練並檢查樣本外結果。
+4. 到「強化學習」建立附加 Transformer 的 BTC 15m 環境，再訓練 SAC。
+5. 到「模型回測」檢查交易成本、PF、Expectancy、回撤與強平次數。
+6. 通過門檻後才建立持久化模擬帳戶；不要直接使用 smoke 模型實盤。
+
+無人值守 Testnet：
+1. 雙擊「安裝無人值守排程.cmd」。
+2. 在 App 的「實盤交易」選擇 Testnet 與「送到目前環境」。
+3. 開啟「Windows 登入後自動恢復 Testnet Worker」後啟動背景輪詢。
+4. Supervisor 與 Watchdog 會在 Windows 登入後獨立運行，不需要保持 App 視窗開啟。
+5. 「安全停止」會取消下次開機恢復；移除功能請雙擊「移除無人值守排程.cmd」。
+
+目前模型角色：
+- Transformer：讀取五週期金融指標，預測報酬、波動、市場狀態並輸出 latent。
+- SAC：根據市場與帳戶狀態，輸出 -1 到 1 的連續目標曝險，可做多、做空或平倉。
+- PPO：只保留作離散動作比較，不是目前主要模型。
+- FinBERT：把有發布時間的 BTC 新聞轉成情緒特徵；資料不足時保持中性。
+
+資料位置：
+- data\raw\crypto\binance_futures：五週期 K 線、24h 統計、衍生品與 Order Book。
+- data\processed：技術特徵、多週期資料集、Transformer、SAC 環境與回測。
+- data\paper_trading：模擬帳戶、決策、訂單、交易與績效。
+- data\models：首次使用 FinBERT 時下載的本機模型快取，桌面包預設不附帶。
+- logs\launcher.log：桌面視窗啟動日誌。
+- logs\startup-refresh.log：啟動資料更新日誌。
+- logs\streamlit-server.log：內部介面服務日誌。
+
+關閉方式：
+- 正常使用時按桌面視窗右上角 X。
+- 已啟用的無人模擬工作需先在介面按「安全停止」。
+- 已啟用的 Testnet Worker 也要在「實盤交易」按「安全停止」，否則關閉 App 後仍會運作。
+- 若視窗異常無法關閉，再雙擊「關閉 AI Quant App.cmd」。
+
+重要限制：
+- 不要只移動 EXE；換電腦時要搬整個 AIQuantTradingSystem 資料夾。
+- Windows 桌面視窗需要 Microsoft Edge WebView2 Runtime。
+- 第一次使用 FinBERT 需要網路下載模型，之後使用本機快取。
+- 固定 CSV 只保存已收盤 K 線；未收盤行情只存在 WebSocket 記憶體快照。
+- 目前保留的 Transformer 與 SAC 是流程 smoke 成品，不具備可驗證獲利能力。
+- Binance Futures Testnet／Live Gateway 已具備保護單與對帳；Live 仍受模型品質與 Testnet 證據門檻鎖定。
+- 正式候選至少要以多個 seed、walk-forward、保留測試集與 3 至 6 個月模擬驗證。
+- 無人模擬交易需要電腦保持開機且不可睡眠。

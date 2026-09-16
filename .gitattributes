@@ -1,0 +1,15 @@
+# 統一文字檔換行，避免 Windows 與 Linux 之間產生不必要差異。
+* text=auto
+
+# 腳本與設定檔使用 LF，方便後續部署到 Linux 或容器環境。
+*.py text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.sh text eol=lf
+
+# Windows 批次檔保留 CRLF。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
