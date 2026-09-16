@@ -19,7 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "ruff>=0.5",
+    "ruff>=0.15.21,<0.16",
 ]
 security = [
     "bandit>=1.9.4,<2.0",
