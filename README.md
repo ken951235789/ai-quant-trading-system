@@ -1,8 +1,40 @@
 # BTC 多時間週期 AI 量化交易研究系統
 
+[![quality](https://github.com/ken951235789/ai-quant-trading-system/actions/workflows/quality.yml/badge.svg)](https://github.com/ken951235789/ai-quant-trading-system/actions/workflows/quality.yml)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
+![Status](https://img.shields.io/badge/status-research_only-E9B949)
+![Live](https://img.shields.io/badge/live-locked-FF6B72)
+
+[English overview](README.en.md) · [五分鐘 Demo](docs/PUBLIC_DEMO.md) · [研究結果](docs/RESEARCH_RESULTS.md) · [系統架構](docs/ARCHITECTURE.md)
+
+![BTC AI Quant Research System](docs/assets/social-preview.png)
+
 這是一套以 **BTC/USDT USD-M 永續合約**為研究標的的 Python 量化交易平台。系統使用已收盤的多時間週期 K 線建立因果特徵，由 Transformer V3 分析市場狀態，再由 SAC 輸出連續目標曝險，最後經過獨立風控、成本模型與執行層處理。
 
 > 本專案是研究與工程作品，不構成投資建議，也不保證獲利。目前模型尚未通過正式資金品質閘門，Live Trading 預設鎖定。
+
+**English summary:** A research-first BTC perpetual futures platform that connects causal multi-timeframe features, Transformer V3 forecasts, SAC target exposure, independent risk controls, cost-aware backtesting, paper trading and a locked live gateway. Current candidates have **not** passed the real-capital quality gate.
+
+## 五分鐘離線 Demo
+
+不需要 Binance 帳號、API Key、GPU、市場資料或模型權重。Demo 會使用固定 seed 的合成 BTC
+15 分鐘行情，實際執行既有的因果特徵工程、模型輸出契約、SAC 目標曝險契約、獨立風控與
+含成本執行層，最後產生 HTML 與 JSON 報告。
+
+```powershell
+git clone https://github.com/ken951235789/ai-quant-trading-system.git
+cd ai-quant-trading-system
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .
+ai-quant-demo --open
+```
+
+Linux/macOS 將啟用指令改為 `source .venv/bin/activate`。報告位於
+`outputs/public_demo/index.html`，稽核摘要位於 `outputs/public_demo/report.json`。
+
+> Demo 的 Transformer／SAC 訊號是清楚標示的因果代理，不是訓練模型，也不代表策略績效。
+> 正式研究結果與負面結果仍以封存的樣本外評估為準。
 
 ## 研究問題
 
@@ -56,7 +88,7 @@ Walk-forward 回測 -> 模擬倉 -> Testnet -> Live 品質閘門
 
 目前 Transformer 在較長的 20 根預測上曾超越多數類別基準，但 5 根短線預測優勢仍不穩定。正式 SAC 候選在四次樣本外測試均為負，因此沒有升級為 Champion，也沒有開啟 final holdout。
 
-這個結果保留在作品集中，因為研究重點是建立可信的驗證流程，而不是只展示最好的一次回測。數字與限制請見 [研究結果](docs/RESEARCH_RESULTS.md)。
+這個結果保留在研究紀錄中，因為研究重點是建立可信的驗證流程，而不是只展示最好的一次回測。數字與限制請見 [研究結果](docs/RESEARCH_RESULTS.md)。
 
 本輪 Transformer-only、SAC 消融與 cross-fit OOS 的設計及操作方式，請見
 [Transformer 與 SAC 三項優化說明](docs/Transformer與SAC三項優化說明.md)。
@@ -100,6 +132,7 @@ streamlit run src\ai_quant_trading\dashboard\app.py --server.address=127.0.0.1
 ```powershell
 python -m ruff check src tests scripts
 python -m pytest -q
+ai-quant-demo --output outputs/public_demo_smoke --bars 360 --seed 11
 ```
 
 ## 研究倫理與限制
@@ -112,4 +145,9 @@ python -m pytest -q
 
 ## 授權
 
-本公開儲存庫目前未授予再散布或商業使用授權，內容主要供學術審查與技術交流。
+本公開儲存庫目前未授予再散布或商業使用授權，內容主要供可重現研究與技術交流。
+
+## 參與專案
+
+研究問題、Bug、可重現性改善與測試案例都歡迎透過 Issue 討論。送出 Pull Request 前請先閱讀
+[貢獻指南](CONTRIBUTING.md)；安全問題請依 [安全政策](SECURITY.md) 私下回報。

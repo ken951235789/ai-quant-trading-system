@@ -1,5 +1,17 @@
 # BTC 15 分鐘系統架構
 
+```mermaid
+flowchart LR
+    A[Binance Futures<br/>REST / WebSocket] --> B[統一 MarketEvent<br/>去重・排序・斷線續傳]
+    B --> C[因果多週期特徵<br/>資料品質守門]
+    C --> D[Transformer V3<br/>報酬・波動・Regime・不確定性]
+    D --> E[SAC 交易員<br/>多・空・續抱・平倉]
+    E --> F[獨立風控<br/>曝險・槓桿・停損・Kill Switch]
+    F --> G[成本感知執行<br/>Fee・Spread・Slippage・Funding]
+    G --> H[回測 / 模擬倉 / Testnet]
+    H -. 品質閘門與人工核准 .-> I[Locked Live Gateway]
+```
+
 ## 系統邊界
 
 目前唯一研究市場是 Binance `BTC/USDT` USD-M 永續合約，決策週期固定為 15 分鐘。

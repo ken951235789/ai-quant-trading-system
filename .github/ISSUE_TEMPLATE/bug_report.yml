@@ -1,0 +1,34 @@
+name: Bug 回報
+description: 回報可重現的程式錯誤或資料契約問題
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "請勿貼上 API Key、.env、帳戶資料或私人交易紀錄。"
+  - type: textarea
+    id: description
+    attributes:
+      label: 問題描述
+      description: 說明實際行為與預期行為。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 重現步驟
+      description: 提供最小命令、設定與去識別化輸入。
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 環境
+      placeholder: "Windows 11 / Python 3.12 / CPU"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 去識別化輸出
+      render: shell

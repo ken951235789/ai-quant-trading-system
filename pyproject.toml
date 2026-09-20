@@ -16,6 +16,9 @@ dependencies = [
     "truststore>=0.10.4; sys_platform == 'win32'",
 ]
 
+[project.scripts]
+ai-quant-demo = "ai_quant_trading.public_demo:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",

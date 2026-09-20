@@ -160,7 +160,7 @@ def _report_text(manifest: dict[str, object], results: pd.DataFrame) -> str:
             "- Consumer 必須以 event_id 冪等，因為分散式系統無法只靠傳輸保證 exactly-once。",
             "- 工作目錄若為 dirty，報告可重現性低於已提交且有版本標籤的 commit。",
             "",
-            "## 推甄知識地圖",
+            "## 研究能力與驗證矩陣",
             "",
             _knowledge_table(),
         ]

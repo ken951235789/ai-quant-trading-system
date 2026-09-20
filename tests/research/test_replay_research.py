@@ -132,5 +132,5 @@ def test_research_report_records_hash_environment_and_reproduction(tmp_path: Pat
     assert manifest["environment"]["python"]
     assert "run_replay_research.py" in manifest["reproduce_command"]
     assert "故障注入結果" in report
-    assert "推甄知識地圖" in report
+    assert "研究能力與驗證矩陣" in report
     assert verify_artifact_manifest(artifacts.experiment_dir)

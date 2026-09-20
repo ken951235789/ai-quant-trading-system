@@ -22,6 +22,15 @@ python scripts/import_training_package.py outputs/model_packages/模型包.zip -
 - 整理舊版市場資料名稱
 - 啟動 PPO／Transformer 歷史回測介面
 
+### run_public_demo.py
+
+用途：不連網、不讀 API Key 或模型權重，以固定 seed 的合成 BTC 15 分鐘行情驗證正式的
+特徵、決策契約、風控與成本流程，並輸出 HTML 與 JSON。這是工程 Demo，不是訓練績效。
+
+```powershell
+python scripts\run_public_demo.py --bars 960 --seed 20260917 --open
+```
+
 腳本只負責串接流程，核心邏輯應放在 `src/ai_quant_trading/` 內。
 
 ### database_admin.py

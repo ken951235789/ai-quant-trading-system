@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "使用本研究程式時，請引用此公開儲存庫與對應版本。"
+title: "BTC Multi-Timeframe AI Quant Trading Research System"
+type: software
+authors:
+  - name: "AI Quant Trading System Contributors"
+repository-code: "https://github.com/ken951235789/ai-quant-trading-system"
+version: "1.0.0-rc.1"
+date-released: 2026-09-20
+abstract: >-
+  A research-first BTC perpetual-futures platform integrating causal multi-timeframe
+  features, Transformer forecasts, Soft Actor-Critic target exposure, independent risk
+  controls and cost-aware evaluation.
+license: "LicenseRef-Proprietary"
