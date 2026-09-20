@@ -29,3 +29,12 @@ jobs:
 
       - name: Compile Python sources
         run: python -m compileall -q src scripts
+
+      - name: Install public demo dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run public demo tests
+        run: python -m pytest -q tests/test_public_demo.py
+
+      - name: Smoke-test public demo
+        run: ai-quant-demo --output outputs/public_demo_smoke --bars 360 --seed 11

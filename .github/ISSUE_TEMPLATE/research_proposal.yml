@@ -1,0 +1,26 @@
+name: 研究改善提案
+description: 提議可重現的特徵、模型、回測或風控實驗
+title: "[Research] "
+labels: ["research"]
+body:
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: 可驗證假設
+      description: 說明為什麼這項改動可能改善樣本外結果。
+    validations:
+      required: true
+  - type: textarea
+    id: protocol
+    attributes:
+      label: 實驗方法
+      description: 列出資料期間、切分、seed、成本、基準與成功條件。
+    validations:
+      required: true
+  - type: textarea
+    id: leakage
+    attributes:
+      label: 洩漏與過度配適風險
+      description: 說明如何避免未來資料與 final holdout 汙染。
+    validations:
+      required: true
