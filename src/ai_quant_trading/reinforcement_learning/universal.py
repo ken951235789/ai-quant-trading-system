@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 import shutil
 
 import numpy as np
@@ -18,7 +19,10 @@ from ai_quant_trading.reinforcement_learning.config import (
 )
 from ai_quant_trading.reinforcement_learning.dataset import MARKET_COLUMNS
 from ai_quant_trading.features.multitimeframe import multitimeframe_numeric_columns
-from ai_quant_trading.features.market_context import MARKET_CONTEXT_COLUMNS, add_model_market_features
+from ai_quant_trading.features.market_context import (
+    MARKET_CONTEXT_COLUMNS,
+    add_model_market_features,
+)
 from ai_quant_trading.reinforcement_learning.feature_contract import (
     attach_expected_return,
     build_expected_return_contract,
@@ -36,9 +40,7 @@ MULTIMODAL_RL_FEATURE_COLUMNS = [
     "u_finbert_sentiment_change",
     "u_finbert_recency",
     "u_finbert_available",
-    "u_transformer_return_1",
-    "u_transformer_return_5",
-    "u_transformer_return_20",
+    *[f"u_transformer_return_{horizon}" for horizon in (1, 5, 20, 48)],
     "u_transformer_volatility",
     "u_transformer_bull_probability",
     "u_transformer_bear_probability",
@@ -46,7 +48,7 @@ MULTIMODAL_RL_FEATURE_COLUMNS = [
     "u_transformer_available",
     *[
         f"u_transformer_{name}_{horizon}"
-        for horizon in (1, 5, 20)
+        for horizon in (1, 5, 20, 48)
         for name in (
             "direction_edge",
             "movement_direction_edge",
@@ -78,9 +80,40 @@ MULTIMODAL_RL_FEATURE_COLUMNS = [
     "u_transformer_signal_entropy",
     "u_transformer_decision_confidence",
     "u_transformer_no_trade_pressure",
-    "u_transformer_net_edge_advantage_5",
-    "u_transformer_expected_best_edge_5",
+    *[
+        f"u_transformer_{name}_{horizon}"
+        for horizon in (5, 20, 48)
+        for name in ("net_edge_advantage", "expected_best_edge")
+    ],
 ]
+
+
+_TRANSFORMER_HORIZON_PATTERN = re.compile(
+    r"^transformer_(?:return|tradeability|down_probability|side_up_probability)_(\d+)$"
+)
+
+
+def _transformer_horizons(frame: pd.DataFrame) -> tuple[int, ...]:
+    """由推論欄位辨識 checkpoint 的 horizons，並保留舊版 1／5／20 相容性。"""
+    values = {
+        int(match.group(1))
+        for column in frame.columns
+        if (match := _TRANSFORMER_HORIZON_PATTERN.match(str(column)))
+    }
+    return tuple(sorted(values)) or (5, 20, 48)
+
+
+def _transformer_role_horizons(
+    horizons: tuple[int, ...],
+) -> tuple[int, int, int]:
+    """把可用 horizon 映射成執行、setup、趨勢三個互補角色。"""
+    if {5, 20, 48}.issubset(horizons):
+        return 5, 20, 48
+    if {1, 5, 20}.issubset(horizons):
+        return 1, 5, 20
+    ordered = tuple(sorted(horizons))
+    return ordered[0], ordered[len(ordered) // 2], ordered[-1]
+
 
 ADVANCED_RL_FEATURE_COLUMNS = [
     "u_macro_yield_curve",
@@ -313,6 +346,7 @@ UNIVERSAL_SOURCE_FEATURE_COLUMNS = [
     "short_reversal_position",
 ]
 
+
 def _multitimeframe_source_columns(frame: pd.DataFrame) -> list[str]:
     """依 CSV 欄位順序列出多週期數值特徵，排除描述欄位。"""
     return multitimeframe_numeric_columns(frame)
@@ -369,7 +403,9 @@ class UniversalRLArtifactPaths:
 
 
 def add_universal_rl_features(
-    frame: pd.DataFrame, *, feature_columns: list[str] | None = None,
+    frame: pd.DataFrame,
+    *,
+    feature_columns: list[str] | None = None,
 ) -> pd.DataFrame:
     """把價格型指標轉成跨資產可比較的比例與 Z-score。"""
     required = [*MARKET_COLUMNS, *UNIVERSAL_SOURCE_FEATURE_COLUMNS]
@@ -377,10 +413,12 @@ def add_universal_rl_features(
     if missing:
         raise ValueError(f"通用 RL 資料缺少欄位：{missing}")
     # 模擬交易可能重複準備同一份資料；先移除舊衍生欄，避免同名欄位重複。
-    result = add_model_market_features(frame.drop(
-        columns=[column for column in frame.columns if column.startswith("u_")],
-        errors="ignore",
-    ))
+    result = add_model_market_features(
+        frame.drop(
+            columns=[column for column in frame.columns if column.startswith("u_")],
+            errors="ignore",
+        )
+    )
     numeric = ["close", *UNIVERSAL_SOURCE_FEATURE_COLUMNS]
     result[numeric] = result[numeric].apply(pd.to_numeric, errors="coerce")
     close = result["close"]
@@ -397,8 +435,8 @@ def add_universal_rl_features(
     result["u_roc_12_pct"] = result["roc_12_pct"] / 100
     result["u_atr_pct"] = result["atr_14"] / close
     band_deviation = (result["bb_upper_20"] - result["bb_lower_20"]) / 4
-    result["u_bb_zscore_20"] = (
-        (close - result["bb_middle_20"]) / band_deviation.where(band_deviation != 0)
+    result["u_bb_zscore_20"] = (close - result["bb_middle_20"]) / band_deviation.where(
+        band_deviation != 0
     )
     result["u_bb_width_20"] = result["bb_width_20"]
     result["u_historical_volatility_20"] = result["historical_volatility_20"]
@@ -429,12 +467,9 @@ def add_universal_rl_features(
         result[f"u_realized_volatility_{window}"] = log_returns.rolling(
             window, min_periods=window
         ).std(ddof=0)
-    result["u_volatility_ratio_5_20"] = (
-        result["u_realized_volatility_5"]
-        / result["u_realized_volatility_20"].where(
-            result["u_realized_volatility_20"] != 0
-        )
-    )
+    result["u_volatility_ratio_5_20"] = result["u_realized_volatility_5"] / result[
+        "u_realized_volatility_20"
+    ].where(result["u_realized_volatility_20"] != 0)
     downside = returns.clip(upper=0)
     result["u_downside_volatility_20"] = downside.rolling(20, min_periods=20).std(ddof=0)
     for window in [20, 60, 252]:
@@ -443,21 +478,19 @@ def add_universal_rl_features(
 
     volume_mean = result["volume"].rolling(20, min_periods=20).mean()
     volume_std = result["volume"].rolling(20, min_periods=20).std(ddof=0)
-    result["u_volume_zscore_20"] = (
-        (result["volume"] - volume_mean) / volume_std.where(volume_std != 0)
+    result["u_volume_zscore_20"] = (result["volume"] - volume_mean) / volume_std.where(
+        volume_std != 0
     )
     dollar_volume = close * result["volume"]
     dollar_mean = dollar_volume.rolling(20, min_periods=20).mean()
     dollar_std = dollar_volume.rolling(20, min_periods=20).std(ddof=0)
-    result["u_dollar_volume_zscore_20"] = (
-        (dollar_volume - dollar_mean) / dollar_std.where(dollar_std != 0)
+    result["u_dollar_volume_zscore_20"] = (dollar_volume - dollar_mean) / dollar_std.where(
+        dollar_std != 0
     )
     result["u_range_pct"] = (result["high"] - result["low"]) / close
     result["u_gap_return"] = result["open"] / close.shift(1) - 1
     path_length = close.diff().abs().rolling(20, min_periods=20).sum()
-    result["u_efficiency_ratio_20"] = (
-        close.diff(20).abs() / path_length.where(path_length != 0)
-    )
+    result["u_efficiency_ratio_20"] = close.diff(20).abs() / path_length.where(path_length != 0)
     high_20 = result["high"].rolling(20, min_periods=20).max()
     low_20 = result["low"].rolling(20, min_periods=20).min()
     result["u_distance_high_20"] = close / high_20.where(high_20 != 0) - 1
@@ -483,8 +516,13 @@ def add_universal_rl_features(
     # 多週期建構器已先做因果對齊；此處只轉成通用環境的 u_ 特徵契約。
     mtf_features: dict[str, pd.Series] = {}
     mtf_sources = (
-        [column for column in result if column.startswith("mtf_") and f"u_{column}" in feature_columns]
-        if feature_columns is not None else _multitimeframe_source_columns(result)
+        [
+            column
+            for column in result
+            if column.startswith("mtf_") and f"u_{column}" in feature_columns
+        ]
+        if feature_columns is not None
+        else _multitimeframe_source_columns(result)
     )
     for column in mtf_sources:
         target = f"u_{column}"
@@ -527,134 +565,79 @@ def add_universal_rl_features(
     advanced = pd.DataFrame(
         {
             "u_macro_yield_curve": (
-                optional_numeric("macro_yield_curve_10y_2y")
-                .fillna(0.0)
-                .clip(-10.0, 10.0)
-                / 100
+                optional_numeric("macro_yield_curve_10y_2y").fillna(0.0).clip(-10.0, 10.0) / 100
             ),
             "u_macro_vix_level": (
-                optional_numeric("macro_vixcls_value").fillna(0.0).clip(0.0, 100.0)
-                / 100
+                optional_numeric("macro_vixcls_value").fillna(0.0).clip(0.0, 100.0) / 100
             ),
             "u_macro_vix_zscore": (
-                optional_numeric("macro_vixcls_zscore_60")
-                .fillna(0.0)
-                .clip(-5.0, 5.0)
-                / 5
+                optional_numeric("macro_vixcls_zscore_60").fillna(0.0).clip(-5.0, 5.0) / 5
             ),
             "u_macro_dollar_change": (
-                optional_numeric("macro_dtwexbgs_pct_change")
-                .fillna(0.0)
-                .clip(-0.2, 0.2)
+                optional_numeric("macro_dtwexbgs_pct_change").fillna(0.0).clip(-0.2, 0.2)
             ),
             "u_macro_high_yield_spread": (
-                optional_numeric("macro_bamlh0a0hym2_value")
-                .fillna(0.0)
-                .clip(0.0, 25.0)
-                / 100
+                optional_numeric("macro_bamlh0a0hym2_value").fillna(0.0).clip(0.0, 25.0) / 100
             ),
             "u_macro_available": macro_available.fillna(0.0).clip(0.0, 1.0),
             "u_breadth_advance_ratio": (
                 optional_numeric("breadth_advance_ratio").fillna(0.5).clip(0.0, 1.0)
             ),
             "u_breadth_above_sma_20": (
-                optional_numeric("breadth_pct_above_sma_20")
-                .fillna(0.5)
-                .clip(0.0, 1.0)
+                optional_numeric("breadth_pct_above_sma_20").fillna(0.5).clip(0.0, 1.0)
             ),
             "u_breadth_above_sma_50": (
-                optional_numeric("breadth_pct_above_sma_50")
-                .fillna(0.5)
-                .clip(0.0, 1.0)
+                optional_numeric("breadth_pct_above_sma_50").fillna(0.5).clip(0.0, 1.0)
             ),
             "u_breadth_above_sma_200": (
-                optional_numeric("breadth_pct_above_sma_200")
-                .fillna(0.5)
-                .clip(0.0, 1.0)
+                optional_numeric("breadth_pct_above_sma_200").fillna(0.5).clip(0.0, 1.0)
             ),
             "u_breadth_new_high_ratio": (
-                optional_numeric("breadth_new_high_ratio_20")
-                .fillna(0.0)
-                .clip(0.0, 1.0)
+                optional_numeric("breadth_new_high_ratio_20").fillna(0.0).clip(0.0, 1.0)
             ),
             "u_breadth_new_low_ratio": (
-                optional_numeric("breadth_new_low_ratio_20")
-                .fillna(0.0)
-                .clip(0.0, 1.0)
+                optional_numeric("breadth_new_low_ratio_20").fillna(0.0).clip(0.0, 1.0)
             ),
             "u_breadth_median_return": (
-                optional_numeric("breadth_median_return")
-                .fillna(0.0)
-                .clip(-0.5, 0.5)
+                optional_numeric("breadth_median_return").fillna(0.0).clip(-0.5, 0.5)
             ),
             "u_breadth_dispersion": (
-                optional_numeric("breadth_return_dispersion")
-                .fillna(0.0)
-                .clip(0.0, 0.5)
+                optional_numeric("breadth_return_dispersion").fillna(0.0).clip(0.0, 0.5)
             ),
             "u_breadth_available": breadth_available.fillna(0.0).clip(0.0, 1.0),
             "u_fundamental_revenue_growth": (
-                optional_numeric("fundamental_revenue_growth")
-                .fillna(0.0)
-                .clip(-2.0, 5.0)
+                optional_numeric("fundamental_revenue_growth").fillna(0.0).clip(-2.0, 5.0)
             ),
             "u_fundamental_profit_margin": (
-                optional_numeric("fundamental_profit_margin")
-                .fillna(0.0)
-                .clip(-2.0, 2.0)
+                optional_numeric("fundamental_profit_margin").fillna(0.0).clip(-2.0, 2.0)
             ),
             "u_fundamental_operating_margin": (
-                optional_numeric("fundamental_operating_margin")
-                .fillna(0.0)
-                .clip(-2.0, 2.0)
+                optional_numeric("fundamental_operating_margin").fillna(0.0).clip(-2.0, 2.0)
             ),
             "u_fundamental_debt_to_equity": (
-                optional_numeric("fundamental_debt_to_equity")
-                .fillna(0.0)
-                .clip(-10.0, 10.0)
-                / 10
+                optional_numeric("fundamental_debt_to_equity").fillna(0.0).clip(-10.0, 10.0) / 10
             ),
             "u_fundamental_ocf_margin": (
-                optional_numeric("fundamental_ocf_margin")
-                .fillna(0.0)
-                .clip(-2.0, 2.0)
+                optional_numeric("fundamental_ocf_margin").fillna(0.0).clip(-2.0, 2.0)
             ),
-            "u_fundamentals_available": (
-                fundamentals_available.fillna(0.0).clip(0.0, 1.0)
-            ),
+            "u_fundamentals_available": (fundamentals_available.fillna(0.0).clip(0.0, 1.0)),
             "u_global_long_short_pressure": (
-                np.log(
-                    optional_numeric("global_long_short_ratio")
-                    .fillna(1.0)
-                    .clip(0.05, 20.0)
-                )
+                np.log(optional_numeric("global_long_short_ratio").fillna(1.0).clip(0.05, 20.0))
                 / np.log(20.0)
             ),
             "u_taker_buy_sell_pressure": (
-                np.log(
-                    optional_numeric("taker_buy_sell_ratio")
-                    .fillna(1.0)
-                    .clip(0.05, 20.0)
-                )
+                np.log(optional_numeric("taker_buy_sell_ratio").fillna(1.0).clip(0.05, 20.0))
                 / np.log(20.0)
             ),
-            "u_basis_rate": (
-                optional_numeric("basis_rate").fillna(0.0).clip(-0.2, 0.2)
-            ),
+            "u_basis_rate": (optional_numeric("basis_rate").fillna(0.0).clip(-0.2, 0.2)),
             "u_orderbook_imbalance_5": (
-                optional_numeric("orderbook_imbalance_5")
-                .fillna(0.0)
-                .clip(-1.0, 1.0)
+                optional_numeric("orderbook_imbalance_5").fillna(0.0).clip(-1.0, 1.0)
             ),
             "u_orderbook_imbalance_10": (
-                optional_numeric("orderbook_imbalance_10")
-                .fillna(0.0)
-                .clip(-1.0, 1.0)
+                optional_numeric("orderbook_imbalance_10").fillna(0.0).clip(-1.0, 1.0)
             ),
             "u_orderbook_imbalance_20": (
-                optional_numeric("orderbook_imbalance_20")
-                .fillna(0.0)
-                .clip(-1.0, 1.0)
+                optional_numeric("orderbook_imbalance_20").fillna(0.0).clip(-1.0, 1.0)
             ),
             "u_orderbook_microprice_deviation": (
                 optional_numeric("orderbook_microprice_deviation_bps")
@@ -663,14 +646,9 @@ def add_universal_rl_features(
                 / 10_000
             ),
             "u_orderbook_spread_rate": (
-                optional_numeric("orderbook_spread_bps")
-                .fillna(0.0)
-                .clip(0.0, 1_000.0)
-                / 10_000
+                optional_numeric("orderbook_spread_bps").fillna(0.0).clip(0.0, 1_000.0) / 10_000
             ),
-            "u_orderbook_available": (
-                orderbook_available.fillna(0.0).clip(0.0, 1.0)
-            ),
+            "u_orderbook_available": (orderbook_available.fillna(0.0).clip(0.0, 1.0)),
         },
         index=result.index,
     )
@@ -685,13 +663,13 @@ def add_universal_rl_features(
     finbert_available = optional_numeric("finbert_available")
     if "finbert_available" not in result:
         finbert_available = (
-            finbert_sentiment.notna()
-            | finbert_positive.notna()
-            | finbert_negative.notna()
+            finbert_sentiment.notna() | finbert_positive.notna() | finbert_negative.notna()
         ).astype(float)
     transformer_available = optional_numeric("transformer_available")
     if "transformer_available" not in result:
         transformer_available = pd.Series(0.0, index=result.index, dtype="float64")
+    transformer_horizons = _transformer_horizons(result)
+    generated_horizons = tuple(sorted(set(transformer_horizons).union({1, 5, 20, 48})))
     multimodal = pd.DataFrame(
         {
             "u_finbert_sentiment": finbert_sentiment.fillna(0.0).clip(-1.0, 1.0),
@@ -699,8 +677,7 @@ def add_universal_rl_features(
             "u_finbert_negative": finbert_negative.fillna(0.0).clip(0.0, 1.0),
             "u_finbert_confidence": finbert_confidence.fillna(0.0).clip(0.0, 1.0),
             "u_finbert_news_count_log": (
-                np.log1p(finbert_news_count.fillna(0.0).clip(0.0, 100.0))
-                / np.log1p(100.0)
+                np.log1p(finbert_news_count.fillna(0.0).clip(0.0, 100.0)) / np.log1p(100.0)
             ),
             "u_finbert_sentiment_change": finbert_change.fillna(0.0).clip(-2.0, 2.0),
             "u_finbert_recency": (
@@ -708,62 +685,60 @@ def add_universal_rl_features(
                 * finbert_available.fillna(0.0).clip(0.0, 1.0)
             ),
             "u_finbert_available": finbert_available.fillna(0.0).clip(0.0, 1.0),
-            "u_transformer_return_1": (
-                optional_numeric("transformer_return_1").fillna(0.0).clip(-1.0, 1.0)
-            ),
-            "u_transformer_return_5": (
-                optional_numeric("transformer_return_5").fillna(0.0).clip(-1.0, 1.0)
-            ),
-            "u_transformer_return_20": (
-                optional_numeric("transformer_return_20").fillna(0.0).clip(-1.0, 1.0)
-            ),
             "u_transformer_volatility": (
                 optional_numeric("transformer_volatility").fillna(0.0).clip(0.0, 1.0)
             ),
             "u_transformer_bull_probability": (
-                optional_numeric("transformer_bull_probability")
-                .fillna(0.0)
-                .clip(0.0, 1.0)
+                optional_numeric("transformer_bull_probability").fillna(0.0).clip(0.0, 1.0)
             ),
             "u_transformer_bear_probability": (
-                optional_numeric("transformer_bear_probability")
-                .fillna(0.0)
-                .clip(0.0, 1.0)
+                optional_numeric("transformer_bear_probability").fillna(0.0).clip(0.0, 1.0)
             ),
             "u_transformer_uncertainty": (
                 optional_numeric("transformer_uncertainty").fillna(0.0).clip(0.0, 1.0)
             ),
-            "u_transformer_available": (
-                transformer_available.fillna(0.0).clip(0.0, 1.0)
-            ),
+            "u_transformer_available": (transformer_available.fillna(0.0).clip(0.0, 1.0)),
         },
         index=result.index,
     )
-    for horizon in (1, 5, 20):
-        down = optional_numeric(
-            f"transformer_down_probability_{horizon}"
-        ).fillna(0.0).clip(0.0, 1.0)
-        up = optional_numeric(
-            f"transformer_up_probability_{horizon}"
-        ).fillna(0.0).clip(0.0, 1.0)
-        neutral = optional_numeric(
-            f"transformer_neutral_probability_{horizon}"
-        ).fillna(0.0).clip(0.0, 1.0)
-        movement_down = optional_numeric(
-            f"transformer_movement_down_probability_{horizon}"
-        ).fillna(0.0).clip(0.0, 1.0)
-        movement_neutral = optional_numeric(
-            f"transformer_movement_neutral_probability_{horizon}"
-        ).fillna(0.0).clip(0.0, 1.0)
-        movement_up = optional_numeric(
-            f"transformer_movement_up_probability_{horizon}"
-        ).fillna(0.0).clip(0.0, 1.0)
-        side_down = optional_numeric(
-            f"transformer_side_down_probability_{horizon}"
-        ).fillna(0.0).clip(0.0, 1.0)
-        side_up = optional_numeric(
-            f"transformer_side_up_probability_{horizon}"
-        ).fillna(0.0).clip(0.0, 1.0)
+    for horizon in generated_horizons:
+        multimodal[f"u_transformer_return_{horizon}"] = (
+            optional_numeric(f"transformer_return_{horizon}").fillna(0.0).clip(-1.0, 1.0)
+        )
+        down = (
+            optional_numeric(f"transformer_down_probability_{horizon}").fillna(0.0).clip(0.0, 1.0)
+        )
+        up = optional_numeric(f"transformer_up_probability_{horizon}").fillna(0.0).clip(0.0, 1.0)
+        neutral = (
+            optional_numeric(f"transformer_neutral_probability_{horizon}")
+            .fillna(0.0)
+            .clip(0.0, 1.0)
+        )
+        movement_down = (
+            optional_numeric(f"transformer_movement_down_probability_{horizon}")
+            .fillna(0.0)
+            .clip(0.0, 1.0)
+        )
+        movement_neutral = (
+            optional_numeric(f"transformer_movement_neutral_probability_{horizon}")
+            .fillna(0.0)
+            .clip(0.0, 1.0)
+        )
+        movement_up = (
+            optional_numeric(f"transformer_movement_up_probability_{horizon}")
+            .fillna(0.0)
+            .clip(0.0, 1.0)
+        )
+        side_down = (
+            optional_numeric(f"transformer_side_down_probability_{horizon}")
+            .fillna(0.0)
+            .clip(0.0, 1.0)
+        )
+        side_up = (
+            optional_numeric(f"transformer_side_up_probability_{horizon}")
+            .fillna(0.0)
+            .clip(0.0, 1.0)
+        )
         side_total = side_down + side_up
         legacy_side_total = down + up
         side_down = side_down.where(
@@ -774,152 +749,178 @@ def add_universal_rl_features(
             side_total > 0,
             up / legacy_side_total.where(legacy_side_total > 0),
         ).fillna(0.0)
-        lower = optional_numeric(
-            f"transformer_return_q10_{horizon}"
-        ).fillna(0.0).clip(-1.0, 1.0)
-        median = optional_numeric(
-            f"transformer_return_q50_{horizon}"
-        ).fillna(0.0).clip(-1.0, 1.0)
-        upper = optional_numeric(
-            f"transformer_return_q90_{horizon}"
-        ).fillna(0.0).clip(-1.0, 1.0)
+        lower = optional_numeric(f"transformer_return_q10_{horizon}").fillna(0.0).clip(-1.0, 1.0)
+        median = optional_numeric(f"transformer_return_q50_{horizon}").fillna(0.0).clip(-1.0, 1.0)
+        upper = optional_numeric(f"transformer_return_q90_{horizon}").fillna(0.0).clip(-1.0, 1.0)
         multimodal[f"u_transformer_direction_edge_{horizon}"] = up - down
-        multimodal[f"u_transformer_movement_direction_edge_{horizon}"] = (
-            movement_up - movement_down
-        )
-        multimodal[f"u_transformer_movement_neutral_probability_{horizon}"] = (
-            movement_neutral
-        )
-        multimodal[f"u_transformer_side_direction_edge_{horizon}"] = (
-            side_up - side_down
-        )
+        multimodal[f"u_transformer_movement_direction_edge_{horizon}"] = movement_up - movement_down
+        multimodal[f"u_transformer_movement_neutral_probability_{horizon}"] = movement_neutral
+        multimodal[f"u_transformer_side_direction_edge_{horizon}"] = side_up - side_down
         multimodal[f"u_transformer_neutral_probability_{horizon}"] = neutral
         multimodal[f"u_transformer_return_q10_{horizon}"] = lower
         multimodal[f"u_transformer_return_q50_{horizon}"] = median
         multimodal[f"u_transformer_return_q90_{horizon}"] = upper
-        multimodal[f"u_transformer_interval_width_{horizon}"] = (
-            upper - lower
-        ).clip(0.0, 2.0)
+        multimodal[f"u_transformer_interval_width_{horizon}"] = (upper - lower).clip(0.0, 2.0)
         for name in (
             "long_edge",
             "short_edge",
             "downside_excursion",
             "upside_excursion",
         ):
-            multimodal[f"u_transformer_{name}_{horizon}"] = optional_numeric(
-                f"transformer_{name}_{horizon}"
-            ).fillna(0.0).clip(-1.0 if "edge" in name else 0.0, 1.0)
-        multimodal[f"u_transformer_tradeability_{horizon}"] = optional_numeric(
-            f"transformer_tradeability_{horizon}"
-        ).fillna(0.0).clip(0.0, 1.0)
+            multimodal[f"u_transformer_{name}_{horizon}"] = (
+                optional_numeric(f"transformer_{name}_{horizon}")
+                .fillna(0.0)
+                .clip(-1.0 if "edge" in name else 0.0, 1.0)
+            )
+        multimodal[f"u_transformer_tradeability_{horizon}"] = (
+            optional_numeric(f"transformer_tradeability_{horizon}").fillna(0.0).clip(0.0, 1.0)
+        )
     for name in ("low", "normal", "high"):
         multimodal[f"u_transformer_volatility_regime_{name}_probability"] = (
-            optional_numeric(
-                f"transformer_volatility_regime_{name}_probability"
-            ).fillna(0.0).clip(0.0, 1.0)
+            optional_numeric(f"transformer_volatility_regime_{name}_probability")
+            .fillna(0.0)
+            .clip(0.0, 1.0)
         )
     for name in ("fast", "medium", "slow"):
-        multimodal[f"u_transformer_timeframe_{name}_attention"] = optional_numeric(
-            f"transformer_timeframe_{name}_attention"
-        ).fillna(0.0).clip(0.0, 1.0)
+        multimodal[f"u_transformer_timeframe_{name}_attention"] = (
+            optional_numeric(f"transformer_timeframe_{name}_attention").fillna(0.0).clip(0.0, 1.0)
+        )
     available = multimodal["u_transformer_available"]
     confidence = (1.0 - multimodal["u_transformer_uncertainty"]).clip(0.0, 1.0)
     role_signals: dict[int, pd.Series] = {}
-    for horizon in (1, 5, 20):
+    for horizon in transformer_horizons:
         role_signals[horizon] = (
             multimodal[f"u_transformer_side_direction_edge_{horizon}"]
             * multimodal[f"u_transformer_tradeability_{horizon}"]
             * confidence
             * available
         )
-    multimodal["u_transformer_execution_signal"] = role_signals[1]
-    multimodal["u_transformer_setup_signal"] = role_signals[5]
-    multimodal["u_transformer_trend_signal"] = role_signals[20]
-    multimodal["u_transformer_consensus_signal"] = (
-        0.15 * role_signals[1]
-        + 0.35 * role_signals[5]
-        + 0.50 * role_signals[20]
+    execution_horizon, setup_horizon, trend_horizon = _transformer_role_horizons(
+        transformer_horizons
     )
-    signal_frame = pd.DataFrame(role_signals, index=result.index)
+    role_horizons = (execution_horizon, setup_horizon, trend_horizon)
+    role_weights = (0.15, 0.35, 0.50) if role_horizons == (1, 5, 20) else (0.50, 0.35, 0.15)
+    multimodal["u_transformer_execution_signal"] = role_signals[execution_horizon]
+    multimodal["u_transformer_setup_signal"] = role_signals[setup_horizon]
+    multimodal["u_transformer_trend_signal"] = role_signals[trend_horizon]
+    multimodal["u_transformer_consensus_signal"] = sum(
+        weight * role_signals[horizon]
+        for horizon, weight in zip(role_horizons, role_weights, strict=True)
+    )
+    signal_frame = pd.DataFrame(
+        {horizon: role_signals[horizon] for horizon in role_horizons},
+        index=result.index,
+    )
     multimodal["u_transformer_signal_disagreement"] = (
         signal_frame.max(axis=1) - signal_frame.min(axis=1)
     ) * available
     # 分歧保留下來作為風險情境，而不是強迫三個預測 horizon 同方向。
     horizon_probabilities = []
-    for horizon in (1, 5, 20):
-        values = pd.concat([
-            optional_numeric(f"transformer_{name}_probability_{horizon}")
-            for name in ("down", "neutral", "up")
-        ], axis=1).fillna(0).clip(0, 1)
+    for horizon in role_horizons:
+        values = (
+            pd.concat(
+                [
+                    optional_numeric(f"transformer_{name}_probability_{horizon}")
+                    for name in ("down", "neutral", "up")
+                ],
+                axis=1,
+            )
+            .fillna(0)
+            .clip(0, 1)
+        )
         values.columns = ["down", "neutral", "up"]
         values = values.div(values.sum(axis=1).replace(0, np.nan), axis=0).fillna(0)
         horizon_probabilities.append(values)
     average_probability = sum(horizon_probabilities) / len(horizon_probabilities)
     multimodal["u_transformer_signal_entropy"] = (
         -(average_probability * np.log(average_probability.clip(lower=1e-12))).sum(axis=1)
-        / np.log(3) * available
-    ).clip(0, 1)
-    weighted_tradeability = (
-        0.15 * multimodal["u_transformer_tradeability_1"]
-        + 0.35 * multimodal["u_transformer_tradeability_5"]
-        + 0.50 * multimodal["u_transformer_tradeability_20"]
-    )
-    multimodal["u_transformer_decision_confidence"] = (
-        confidence * weighted_tradeability * available
-    )
-    multimodal["u_transformer_no_trade_pressure"] = (
-        (1.0 - weighted_tradeability) * available
-    )
-    multimodal["u_transformer_net_edge_advantage_5"] = (
-        multimodal["u_transformer_long_edge_5"]
-        - multimodal["u_transformer_short_edge_5"]
-    ) * available
-    multimodal["u_transformer_expected_best_edge_5"] = (
-        multimodal[["u_transformer_long_edge_5", "u_transformer_short_edge_5"]]
-        .max(axis=1)
-        .clip(-1.0, 1.0)
-        * multimodal["u_transformer_tradeability_5"]
+        / np.log(3)
         * available
+    ).clip(0, 1)
+    weighted_tradeability = sum(
+        weight * multimodal[f"u_transformer_tradeability_{horizon}"]
+        for horizon, weight in zip(role_horizons, role_weights, strict=True)
     )
-    market_context = pd.DataFrame({
-        f"u_{column}": pd.to_numeric(result[column], errors="coerce").fillna(0)
-        for column in MARKET_CONTEXT_COLUMNS
-    }, index=result.index)
+    multimodal["u_transformer_decision_confidence"] = confidence * weighted_tradeability * available
+    multimodal["u_transformer_no_trade_pressure"] = (1.0 - weighted_tradeability) * available
+    for horizon in generated_horizons:
+        multimodal[f"u_transformer_net_edge_advantage_{horizon}"] = (
+            multimodal[f"u_transformer_long_edge_{horizon}"]
+            - multimodal[f"u_transformer_short_edge_{horizon}"]
+        ) * available
+        multimodal[f"u_transformer_expected_best_edge_{horizon}"] = (
+            multimodal[
+                [
+                    f"u_transformer_long_edge_{horizon}",
+                    f"u_transformer_short_edge_{horizon}",
+                ]
+            ]
+            .max(axis=1)
+            .clip(-1.0, 1.0)
+            * multimodal[f"u_transformer_tradeability_{horizon}"]
+            * available
+        )
+    market_context = pd.DataFrame(
+        {
+            f"u_{column}": pd.to_numeric(result[column], errors="coerce").fillna(0)
+            for column in MARKET_CONTEXT_COLUMNS
+        },
+        index=result.index,
+    )
     if feature_columns is not None:
-        result = result.drop(columns=[
-            column for column in result if column.startswith("u_") and column not in feature_columns
-        ])
+        result = result.drop(
+            columns=[
+                column
+                for column in result
+                if column.startswith("u_") and column not in feature_columns
+            ]
+        )
         advanced = advanced[[column for column in advanced if column in feature_columns]]
         multimodal = multimodal[[column for column in multimodal if column in feature_columns]]
-        market_context = market_context[[column for column in market_context if column in feature_columns]]
+        market_context = market_context[
+            [column for column in market_context if column in feature_columns]
+        ]
     result = pd.concat([result, advanced, multimodal, market_context], axis=1)
     result.attrs = dict(frame.attrs)
     return result
 
 
 def compact_short_term_feature_columns(
-    frame: pd.DataFrame, *, use_transformer: bool = True, use_finbert: bool = False,
+    frame: pd.DataFrame,
+    *,
+    use_transformer: bool = True,
+    use_finbert: bool = False,
     maximum_features: int = 112,
 ) -> list[str]:
     """依欄位 schema 選擇，第一根暖機缺值不應改變整套模型的輸入。"""
     sample = frame.head(1).copy()
     for column in sample:
-        if column.startswith("mtf_") and column not in {"mtf_source_intervals", "mtf_decision_interval"}:
+        if column.startswith("mtf_") and column not in {
+            "mtf_source_intervals",
+            "mtf_decision_interval",
+        }:
             sample[column] = pd.to_numeric(sample[column], errors="coerce").fillna(0)
     schema = add_universal_rl_features(sample)
     return select_compact_short_term_features(
-        schema, use_transformer=use_transformer, use_finbert=use_finbert,
+        schema,
+        use_transformer=use_transformer,
+        use_finbert=use_finbert,
         maximum_features=maximum_features,
     )
 
 
 def build_compact_short_term_frame(
-    frame: pd.DataFrame, *, use_transformer: bool = True, use_finbert: bool = False,
+    frame: pd.DataFrame,
+    *,
+    use_transformer: bool = True,
+    use_finbert: bool = False,
     maximum_features: int = 112,
 ) -> tuple[pd.DataFrame, list[str]]:
     """只建立固定契約需要的 u_ 欄，降低五年資料記憶體。"""
     columns = compact_short_term_feature_columns(
-        frame, use_transformer=use_transformer, use_finbert=use_finbert,
+        frame,
+        use_transformer=use_transformer,
+        use_finbert=use_finbert,
         maximum_features=maximum_features,
     )
     result = add_universal_rl_features(frame, feature_columns=columns)
@@ -952,13 +953,12 @@ def prepare_universal_rl_dataset(
         expected = mtf_schemas[0]
         if not expected or any(schema != expected for schema in mtf_schemas[1:]):
             raise ValueError("通用 RL 的所有市場必須使用相同多週期特徵架構")
-        selected_features.extend(
-            column for column in expected if column not in selected_features
-        )
+        selected_features.extend(column for column in expected if column not in selected_features)
     if expert_kind == "short_term":
         selected_features = compact_short_term_feature_columns(
             next(iter(frames.values())),
-            use_finbert=use_finbert, use_transformer=use_transformer,
+            use_finbert=use_finbert,
+            use_transformer=use_transformer,
         )
     split = split_config or RLSplitConfig()
     prepared: dict[str, UniversalMarketDataset] = {}
@@ -968,7 +968,9 @@ def prepare_universal_rl_dataset(
         horizon = 5 if expert_kind == "short_term" else 20
         contract = dict(source.attrs.get("expected_return_contract", {}))
         if use_transformer and f"transformer_return_{horizon}" in source:
-            source = attach_expected_return(source, contract or build_expected_return_contract(horizon))
+            source = attach_expected_return(
+                source, contract or build_expected_return_contract(horizon)
+            )
             contract = dict(source.attrs["expected_return_contract"])
         expected_contracts.append(contract)
         result = add_universal_rl_features(source)
@@ -980,10 +982,11 @@ def prepare_universal_rl_dataset(
                     [
                         column
                         for column in selected_features
-                        if column.startswith("u_mtf_")
-                        and column.endswith("_available")
+                        if column.startswith("u_mtf_") and column.endswith("_available")
                     ]
-                ].mean(axis=1).mean()
+                ]
+                .mean(axis=1)
+                .mean()
             )
             if any(
                 column.startswith("u_mtf_") and column.endswith("_available")
@@ -994,21 +997,30 @@ def prepare_universal_rl_dataset(
         if not use_finbert:
             result[[column for column in selected_features if "finbert" in column]] = 0.0
         if not use_transformer:
-            result[
-                [column for column in selected_features if "transformer" in column]
-            ] = 0.0
+            result[[column for column in selected_features if "transformer" in column]] = 0.0
         if expert_kind == "short_term":
             market_schema = select_compact_short_term_features(
-                result, use_finbert=use_finbert, use_transformer=use_transformer,
+                result,
+                use_finbert=use_finbert,
+                use_transformer=use_transformer,
             )
             if market_schema != selected_features:
                 raise ValueError("短線通用 RL 的所有市場必須使用相同精簡特徵契約")
         required = [*MARKET_COLUMNS, *selected_features]
-        required.extend(column for column in (
-            "expected_return", "funding_rate", "spread_bps", "event_blackout",
-            "transformer_available", "transformer_oos", "transformer_oos_fold",
-            "finbert_available",
-        ) if column in result and column not in required)
+        required.extend(
+            column
+            for column in (
+                "expected_return",
+                "funding_rate",
+                "spread_bps",
+                "event_blackout",
+                "transformer_available",
+                "transformer_oos",
+                "transformer_oos_fold",
+                "finbert_available",
+            )
+            if column in result and column not in required
+        )
         if contract and str(contract["source_column"]) in result:
             required.append(str(contract["source_column"]))
         result = result[required].copy()
@@ -1083,19 +1095,16 @@ def save_universal_rl_environment(
     uses_transformer = bool(
         dataset.use_transformer
         and any(
-            float(coverage.get("transformer", 0.0)) > 0
-            for coverage in dataset.ai_coverage.values()
+            float(coverage.get("transformer", 0.0)) > 0 for coverage in dataset.ai_coverage.values()
         )
     )
     if transformer_checkpoint is not None and not transformer_provenance:
         raise ValueError("帶 Transformer 的通用 RL 環境缺少時間隔離來源證明")
     if uses_transformer and not dataset.expected_return_contract:
-        raise ValueError("新 Transformer RL 環境必須明確指定 expected_return_contract，不可猜測預測週期")
-    if (
-        uses_transformer
-        and transformer_checkpoint is None
-        and transformer_crossfit_summary is None
-    ):
+        raise ValueError(
+            "新 Transformer RL 環境必須明確指定 expected_return_contract，不可猜測預測週期"
+        )
+    if uses_transformer and transformer_checkpoint is None and transformer_crossfit_summary is None:
         raise ValueError("Transformer RL 訓練資料必須提供 checkpoint provenance 或 cross-fit 證明")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     run_dir = Path(output_dir).resolve() / f"{stamp}_universal_{len(dataset.markets)}markets"
@@ -1118,9 +1127,8 @@ def save_universal_rl_environment(
             raise FileNotFoundError(f"找不到 Transformer cross-fit 摘要：{source_crossfit}")
         crossfit_payload = json.loads(source_crossfit.read_text(encoding="utf-8"))
         plan = dict(crossfit_payload.get("plan", {}))
-        if (
-            crossfit_payload.get("status") != "complete"
-            or not bool(plan.get("final_holdout_sealed", False))
+        if crossfit_payload.get("status") != "complete" or not bool(
+            plan.get("final_holdout_sealed", False)
         ):
             raise ValueError("Transformer cross-fit 尚未完成或 final holdout 未封存")
         ai_dir = run_dir / "ai"
@@ -1162,13 +1170,10 @@ def save_universal_rl_environment(
         encoding="utf-8",
     )
     intervals = {
-        str(market.frame.iloc[0].get("interval", "unknown"))
-        for market in dataset.markets.values()
+        str(market.frame.iloc[0].get("interval", "unknown")) for market in dataset.markets.values()
     }
     coverage_values = list(dataset.ai_coverage.values())
-    coverage_names = sorted(
-        {name for item in coverage_values for name in item}
-    )
+    coverage_names = sorted({name for item in coverage_values for name in item})
     aggregate_coverage = {
         name: float(np.mean([item.get(name, 0.0) for item in coverage_values]))
         if coverage_values
@@ -1230,9 +1235,7 @@ def save_universal_rl_environment(
                 column.startswith("u_mtf_") for column in dataset.feature_columns
             ),
             "multitimeframe_features": [
-                column
-                for column in dataset.feature_columns
-                if column.startswith("u_mtf_")
+                column for column in dataset.feature_columns if column.startswith("u_mtf_")
             ],
             "availability_flags_required": True,
             "runtime_ready": runtime_ready,
@@ -1242,8 +1245,7 @@ def save_universal_rl_environment(
             "transformer_crossfit_summary": crossfit_relative_path,
             "transformer_provenance": transformer_provenance or {},
             "expected_return_contract": (
-                dataset.expected_return_contract
-                if uses_transformer else None
+                dataset.expected_return_contract if uses_transformer else None
             ),
             "coverage": {
                 "aggregate": aggregate_coverage,

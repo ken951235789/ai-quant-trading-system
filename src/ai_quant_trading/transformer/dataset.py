@@ -231,9 +231,7 @@ class TransformerScaler:
             "edge_means": list(self.edge_means),
             "edge_scales": list(self.edge_scales),
             "excursion_scales": list(self.excursion_scales),
-            "volatility_regime_thresholds": list(
-                self.volatility_regime_thresholds
-            ),
+            "volatility_regime_thresholds": list(self.volatility_regime_thresholds),
             "feature_group_ids": list(self.feature_group_ids),
             "feature_group_names": list(self.feature_group_names),
             "label_mode": self.label_mode,
@@ -305,20 +303,32 @@ class MarketSequenceDataset(Dataset[dict[str, torch.Tensor]]):
             dtype=np.float32,
         )
         horizon_count = len(scaler.return_means)
-        self.edge_means = np.asarray(scaler.edge_means, dtype=np.float32).reshape(
-            horizon_count,
-            2,
-        ) if scaler.edge_means else np.empty((0, 2), dtype=np.float32)
-        self.edge_scales = np.asarray(scaler.edge_scales, dtype=np.float32).reshape(
-            horizon_count,
-            2,
-        ) if scaler.edge_scales else np.empty((0, 2), dtype=np.float32)
-        self.excursion_scales = np.asarray(
-            scaler.excursion_scales,
-            dtype=np.float32,
-        ).reshape(horizon_count, 2) if scaler.excursion_scales else np.empty(
-            (0, 2),
-            dtype=np.float32,
+        self.edge_means = (
+            np.asarray(scaler.edge_means, dtype=np.float32).reshape(
+                horizon_count,
+                2,
+            )
+            if scaler.edge_means
+            else np.empty((0, 2), dtype=np.float32)
+        )
+        self.edge_scales = (
+            np.asarray(scaler.edge_scales, dtype=np.float32).reshape(
+                horizon_count,
+                2,
+            )
+            if scaler.edge_scales
+            else np.empty((0, 2), dtype=np.float32)
+        )
+        self.excursion_scales = (
+            np.asarray(
+                scaler.excursion_scales,
+                dtype=np.float32,
+            ).reshape(horizon_count, 2)
+            if scaler.excursion_scales
+            else np.empty(
+                (0, 2),
+                dtype=np.float32,
+            )
         )
         self.volatility_regime_thresholds = np.asarray(
             scaler.volatility_regime_thresholds,
@@ -339,9 +349,7 @@ class MarketSequenceDataset(Dataset[dict[str, torch.Tensor]]):
         start = endpoint - self.sequence_length + 1
         features = item.features[start : endpoint + 1]
         feature_mask = item.feature_mask[start : endpoint + 1]
-        returns = (
-            item.future_returns[endpoint] - self.return_means
-        ) / self.return_scales
+        returns = (item.future_returns[endpoint] - self.return_means) / self.return_scales
         volatility = (
             item.future_volatility[endpoint] - self.volatility_mean
         ) / self.volatility_scale
@@ -363,15 +371,11 @@ class MarketSequenceDataset(Dataset[dict[str, torch.Tensor]]):
             "movement_directions": torch.from_numpy(
                 item.movement_directions[endpoint].astype(np.int64)
             ),
-            "future_sides": torch.from_numpy(
-                item.future_sides[endpoint].astype(np.int64)
-            ),
+            "future_sides": torch.from_numpy(item.future_sides[endpoint].astype(np.int64)),
             "regime": torch.tensor(regime, dtype=torch.long),
         }
         if self.edge_means.size:
-            edges = (
-                item.edge_returns[endpoint] - self.edge_means
-            ) / self.edge_scales
+            edges = (item.edge_returns[endpoint] - self.edge_means) / self.edge_scales
             excursions = item.future_excursions[endpoint] / self.excursion_scales
             volatility_regime = int(
                 np.searchsorted(
@@ -538,10 +542,7 @@ def _v3_targets(
         lower=0.0,
         upper=training_config.max_observed_spread_bps,
     )
-    fixed_cost = 2 * (
-        training_config.fee_bps_per_side
-        + training_config.slippage_bps_per_side
-    )
+    fixed_cost = 2 * (training_config.fee_bps_per_side + training_config.slippage_bps_per_side)
     round_trip_cost = (fixed_cost + spread_bps) / 10_000
     funding_rate = _numeric_column(
         frame,
@@ -622,12 +623,10 @@ def _v3_targets(
     max_horizon = max(model_config.return_horizons)
     one_bar_returns = close.pct_change(fill_method=None)
     for step in range(1, max_horizon + 1):
-        future_return_paths.append(
-            one_bar_returns.shift(-step).to_numpy(dtype=np.float64)
-        )
-    future_volatility = pd.DataFrame(
-        np.column_stack(future_return_paths)
-    ).std(axis=1, ddof=0).to_numpy()
+        future_return_paths.append(one_bar_returns.shift(-step).to_numpy(dtype=np.float64))
+    future_volatility = (
+        pd.DataFrame(np.column_stack(future_return_paths)).std(axis=1, ddof=0).to_numpy()
+    )
     future_returns = np.column_stack(returns)
     edge_returns = np.stack(edges, axis=1)
     future_excursions = np.stack(excursions, axis=1)
@@ -670,12 +669,12 @@ def _select_feature_columns(
         converted = pd.to_numeric(frames[0][column], errors="coerce")
         if converted.notna().any():
             numeric_candidates.append(column)
-    mtf_candidates = [
-        column for column in numeric_candidates if column.startswith("mtf_")
-    ]
+    mtf_candidates = [column for column in numeric_candidates if column.startswith("mtf_")]
     intervals = market_timeframes(mtf_candidates)
     metadata_priority = [
-        f"mtf_{interval}_{name}" for interval in intervals for name in ("available", "age_ratio")
+        f"mtf_{interval}_{name}"
+        for interval in intervals
+        for name in ("available", "age_ratio")
         if f"mtf_{interval}_{name}" in mtf_candidates
     ]
     grouped_queues: list[list[str]] = []
@@ -683,7 +682,8 @@ def _select_feature_columns(
     for feature_names in MULTITIMEFRAME_FEATURE_GROUPS.values():
         for interval in intervals:
             queue = [
-                f"mtf_{interval}_{name}" for name in feature_names
+                f"mtf_{interval}_{name}"
+                for name in feature_names
                 if f"mtf_{interval}_{name}" in mtf_candidates
             ]
             grouped_queues.append(queue)
@@ -708,9 +708,7 @@ def _select_feature_columns(
     mtf_priority = metadata_priority + [
         column for column in balanced_priority if column not in metadata_priority
     ]
-    base_candidates = [
-        column for column in numeric_candidates if column not in mtf_candidates
-    ]
+    base_candidates = [column for column in numeric_candidates if column not in mtf_candidates]
     priority = [column for column in FEATURE_PRIORITY if column in base_candidates]
     remaining = sorted(column for column in base_candidates if column not in priority)
     base_priority = priority + remaining
@@ -757,6 +755,81 @@ def _safe_scale(values: np.ndarray, axis: int | None = None) -> np.ndarray:
     return np.where(np.isfinite(scale) & (scale > 1e-8), scale, 1.0)
 
 
+def _prune_training_features(
+    frames: Sequence[pd.DataFrame],
+    feature_columns: Sequence[str],
+    training_config: TransformerTrainingConfig,
+) -> tuple[str, ...]:
+    """只以訓練切片移除常數與高度重複欄位，避免看見驗證／測試資料。"""
+    if not feature_columns:
+        return ()
+    sample_blocks: list[np.ndarray] = []
+    rows_per_source = max(
+        100,
+        training_config.correlation_sample_rows // max(len(frames), 1),
+    )
+    for frame in frames:
+        train_cut = int(len(frame) * training_config.train_fraction)
+        numeric = (
+            frame.iloc[:train_cut]
+            .loc[:, feature_columns]
+            .apply(
+                pd.to_numeric,
+                errors="coerce",
+            )
+        )
+        values = numeric.replace([np.inf, -np.inf], np.nan).to_numpy(dtype=np.float64)
+        if len(values) > rows_per_source:
+            indices = np.linspace(
+                0,
+                len(values) - 1,
+                rows_per_source,
+                dtype=np.int64,
+            )
+            values = values[indices]
+        sample_blocks.append(values)
+    sample = np.concatenate(sample_blocks, axis=0)
+    finite_counts = np.isfinite(sample).sum(axis=0)
+    medians = np.nanmedian(sample, axis=0)
+    medians = np.where(np.isfinite(medians), medians, 0.0)
+    filled = np.where(np.isfinite(sample), sample, medians)
+    scales = np.nanstd(filled, axis=0)
+
+    kept_indices = [
+        index
+        for index in range(len(feature_columns))
+        if finite_counts[index] > 0
+        and (
+            not training_config.drop_constant_features
+            or (np.isfinite(scales[index]) and scales[index] > 1e-10)
+        )
+    ]
+    threshold = training_config.max_feature_correlation
+    if threshold is not None and len(kept_indices) > 1:
+        normalized = filled[:, kept_indices]
+        normalized = (normalized - np.mean(normalized, axis=0)) / np.maximum(
+            np.std(normalized, axis=0), 1e-12
+        )
+        correlation = np.abs(
+            np.nan_to_num(
+                np.corrcoef(normalized, rowvar=False),
+                nan=0.0,
+                posinf=1.0,
+                neginf=1.0,
+            )
+        )
+        independent: list[int] = []
+        for local_index, original_index in enumerate(kept_indices):
+            if any(
+                correlation[local_index, previous_local] >= threshold
+                for previous_local in independent
+            ):
+                continue
+            independent.append(local_index)
+        kept_indices = [kept_indices[index] for index in independent]
+    return tuple(feature_columns[index] for index in kept_indices)
+
+
 def prepare_transformer_datasets(
     source_paths: Sequence[str | Path],
     model_config: TemporalTransformerConfig,
@@ -766,9 +839,7 @@ def prepare_transformer_datasets(
     paths = tuple(Path(path).resolve() for path in source_paths)
     if not paths:
         raise ValueError("至少選擇一份特徵 CSV")
-    loaded = [
-        _load_source(path, training_config.max_rows_per_source) for path in paths
-    ]
+    loaded = [_load_source(path, training_config.max_rows_per_source) for path in paths]
     frames = [item[0] for item in loaded]
     sources = tuple(item[1] for item in loaded)
     intervals = {source.interval for source in sources if source.interval}
@@ -776,18 +847,11 @@ def prepare_transformer_datasets(
         raise ValueError("同一次訓練只能使用相同 K 線週期的資料")
 
     feature_columns = _select_feature_columns(frames, model_config.input_features)
-    train_available_columns = []
-    for column in feature_columns:
-        available_in_training = any(
-            pd.to_numeric(
-                frame.iloc[: int(len(frame) * training_config.train_fraction)][column],
-                errors="coerce",
-            ).notna().any()
-            for frame in frames
-        )
-        if available_in_training:
-            train_available_columns.append(column)
-    feature_columns = tuple(train_available_columns)
+    feature_columns = _prune_training_features(
+        frames,
+        feature_columns,
+        training_config,
+    )
     if not feature_columns:
         raise ValueError("Transformer 訓練區段沒有任何可用數值特徵")
     max_horizon = max(model_config.return_horizons)
@@ -802,9 +866,7 @@ def prepare_transformer_datasets(
 
     for frame in frames:
         numeric = frame.loc[:, feature_columns].apply(pd.to_numeric, errors="coerce")
-        feature_values = numeric.replace([np.inf, -np.inf], np.nan).to_numpy(
-            dtype=np.float64
-        )
+        feature_values = numeric.replace([np.inf, -np.inf], np.nan).to_numpy(dtype=np.float64)
         feature_mask = np.isfinite(feature_values).astype(np.float32)
         targets = _v3_targets(frame, model_config, training_config)
         future_returns = targets["future_returns"]
@@ -825,18 +887,14 @@ def prepare_transformer_datasets(
             training_config.validation_fraction,
         )
         if not len(train_ep) or not len(validation_ep) or not len(test_ep):
-            raise ValueError(
-                "資料不足以完成時間切分；請增加 K 線筆數、縮短序列或縮短預測週期"
-            )
+            raise ValueError("資料不足以完成時間切分；請增加 K 線筆數、縮短序列或縮短預測週期")
         training_feature_blocks.append(feature_values[:train_cut])
         training_return_blocks.append(future_returns[train_ep])
         training_volatility_blocks.append(future_volatility[train_ep])
         training_regime_blocks.append(regime_source[train_ep])
         training_edge_blocks.append(edge_returns[train_ep])
         training_excursion_blocks.append(future_excursions[train_ep])
-        training_volatility_regime_blocks.append(
-            volatility_regime_source[train_ep]
-        )
+        training_volatility_regime_blocks.append(volatility_regime_source[train_ep])
         raw_series.append(
             {
                 "features": feature_values,
@@ -891,9 +949,7 @@ def prepare_transformer_datasets(
         1.0,
     )
     volatility_regime_values = np.concatenate(training_volatility_regime_blocks)
-    volatility_regime_values = volatility_regime_values[
-        np.isfinite(volatility_regime_values)
-    ]
+    volatility_regime_values = volatility_regime_values[np.isfinite(volatility_regime_values)]
     if not len(volatility_regime_values):
         raise ValueError("訓練區段無法建立波動制度標籤")
     volatility_quantiles = np.linspace(
@@ -910,9 +966,7 @@ def prepare_transformer_datasets(
     )
     edge_means = tuple(float(value) for value in edge_mean_values.reshape(-1))
     edge_scales = tuple(float(value) for value in edge_scale_values.reshape(-1))
-    excursion_scales = tuple(
-        float(value) for value in excursion_scale_values.reshape(-1)
-    )
+    excursion_scales = tuple(float(value) for value in excursion_scale_values.reshape(-1))
 
     feature_group_ids = transformer_feature_group_ids(feature_columns)
 

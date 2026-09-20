@@ -30,5 +30,5 @@ def test_pipeline_configuration_round_trip(tmp_path) -> None:
 
     assert restored.finbert.batch_size == 32
     assert restored.transformer.sequence_length == 96
-    assert restored.transformer.return_horizons == (1, 5, 20)
+    assert restored.transformer.return_horizons == (5, 20, 48)
     assert "updated_at" in payload

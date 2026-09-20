@@ -21,8 +21,9 @@ def test_expert_profiles_use_different_risk_scales() -> None:
     assert short_term.environment.max_short_fraction == pytest.approx(0.50)
     assert short_term.environment.max_position_fraction == pytest.approx(0.50)
     assert short_term.environment.max_leverage == pytest.approx(3.0)
-    assert short_term.environment.neutral_action_threshold == pytest.approx(0.10)
-    assert short_term.environment.action_semantics == "hold_close_target"
+    assert short_term.environment.neutral_action_threshold == pytest.approx(0.0)
+    assert short_term.environment.action_semantics == "continuous_target"
+    assert short_term.environment.rebalance_deadband == pytest.approx(0.01)
     assert short_term.environment.turnover_penalty < 0.001
     assert short_term.environment.minimum_net_risk_reward == pytest.approx(0.75)
     assert short_term.environment.take_profit_distance == pytest.approx(0.015)

@@ -17,7 +17,9 @@ class TemporalTransformerConfig:
     feedforward_dim: int = 192
     dropout: float = 0.10
     latent_dim: int = 16
-    return_horizons: tuple[int, ...] = (1, 5, 20)
+    # 15 分鐘決策線分別對應 75 分鐘、5 小時與 12 小時。
+    # 最短週期負責執行，中期確認 setup，長期只提供趨勢背景。
+    return_horizons: tuple[int, ...] = (5, 20, 48)
     regime_classes: int = 3
     architecture_version: int = 3
     local_kernel_size: int = 3
@@ -145,14 +147,23 @@ class TransformerTrainingConfig:
     direction_class_balance_power: float = 0.50
     direction_focal_gamma: float = 1.50
     tradeability_class_balance_power: float = 0.50
-    checkpoint_metric: str = "direction_skill_score"
+    checkpoint_metric: str = "deployment_horizon_skill_score"
     checkpoint_loss_penalty: float = 0.02
+    checkpoint_horizon_weights: tuple[float, ...] = ()
+    drop_constant_features: bool = True
+    max_feature_correlation: float | None = 0.985
+    correlation_sample_rows: int = 50_000
     movement_threshold_bps: float = 2.0
     movement_atr_multiplier: float = 0.10
     side_loss_weight: float = 0.75
     side_class_balance_power: float = 0.25
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "checkpoint_horizon_weights",
+            tuple(float(value) for value in self.checkpoint_horizon_weights),
+        )
         if self.epochs <= 0 or self.batch_size <= 0:
             raise ValueError("epochs 與 batch_size 必須大於 0")
         if self.learning_rate <= 0 or self.weight_decay < 0:
@@ -215,12 +226,25 @@ class TransformerTrainingConfig:
             "direction_skill_score",
             "hierarchical_skill_score",
             "cost_aware_direction_balanced_accuracy",
+            "deployment_horizon_skill_score",
         }:
             raise ValueError("checkpoint_metric 不支援")
+        if any(value < 0 for value in self.checkpoint_horizon_weights):
+            raise ValueError("checkpoint_horizon_weights 不可包含負數")
+        if self.checkpoint_horizon_weights and not any(
+            value > 0 for value in self.checkpoint_horizon_weights
+        ):
+            raise ValueError("checkpoint_horizon_weights 至少需要一個正權重")
+        if self.max_feature_correlation is not None and not (0 < self.max_feature_correlation <= 1):
+            raise ValueError("max_feature_correlation 必須介於 0 與 1，或設為 None")
+        if self.correlation_sample_rows < 100:
+            raise ValueError("correlation_sample_rows 至少需要 100")
         if not 0 <= self.label_smoothing < 1:
             raise ValueError("label_smoothing 必須介於 0（含）與 1（不含）之間")
         if self.max_rows_per_source is not None and self.max_rows_per_source < 100:
             raise ValueError("max_rows_per_source 至少需要 100")
 
     def to_dict(self) -> dict[str, object]:
-        return asdict(self)
+        result = asdict(self)
+        result["checkpoint_horizon_weights"] = list(self.checkpoint_horizon_weights)
+        return result

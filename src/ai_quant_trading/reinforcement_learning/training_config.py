@@ -49,22 +49,22 @@ class RLTrainingConfig:
     ppo_target_kl: float | None = None
 
     # SAC 參數
-    sac_buffer_size: int = 200_000
-    sac_learning_starts: int = 5_000
+    sac_buffer_size: int = 400_000
+    sac_learning_starts: int = 20_000
     sac_tau: float = 0.005
     sac_train_freq: int = 1
     sac_train_freq_unit: Literal["step", "episode"] = "step"
     sac_gradient_steps: int = 1
     sac_optimize_memory_usage: bool = False
     sac_n_steps: int = 1
-    sac_ent_coef: str | float = "auto"
+    sac_ent_coef: str | float = "auto_0.01"
     sac_target_update_interval: int = 1
     sac_target_entropy: str | float = "auto"
     sac_use_sde: bool = False
     sac_sde_sample_freq: int = -1
     sac_use_sde_at_warmup: bool = False
-    sac_action_noise: ActionNoiseName = "none"
-    sac_action_noise_sigma: float = 0.1
+    sac_action_noise: ActionNoiseName = "normal"
+    sac_action_noise_sigma: float = 0.05
 
     def __post_init__(self) -> None:
         if self.algorithm not in {"ppo", "sac"}:

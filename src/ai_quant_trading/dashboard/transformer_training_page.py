@@ -74,6 +74,16 @@ def _parse_quantiles(value: str) -> tuple[float, ...]:
     return result
 
 
+def _parse_horizon_weights(value: str) -> tuple[float, ...]:
+    try:
+        result = tuple(float(item.strip()) for item in value.split(",") if item.strip())
+    except ValueError as exc:
+        raise ValueError("Checkpoint 權重請使用逗號分隔的非負數") from exc
+    if result and (any(item < 0 for item in result) or not any(result)):
+        raise ValueError("Checkpoint 權重不可為負，且至少需要一個正數")
+    return result
+
+
 def _load_pipeline(path: Path) -> AIPipelineConfig:
     try:
         return load_ai_pipeline_config(path)
@@ -160,11 +170,7 @@ def _render_job_monitor(transformer_root: Path, project_root: Path) -> None:
     )
     columns[3].metric(
         "狀態準確率",
-        (
-            "-"
-            if regime_accuracy is None
-            else f"{float(regime_accuracy):.1%}"
-        ),
+        ("-" if regime_accuracy is None else f"{float(regime_accuracy):.1%}"),
     )
     columns[4].metric("GPU 記憶體", f"{float(metrics.get('gpu_memory_gb', 0)):.2f} GB")
     columns[5].metric("預估剩餘", _duration_text(progress.get("eta_seconds")))
@@ -231,11 +237,7 @@ def _list_model_runs(transformer_root: Path) -> list[Path]:
     if not models_root.exists():
         return []
     return sorted(
-        (
-            path.parent
-            for path in models_root.glob("*/training.json")
-            if path.is_file()
-        ),
+        (path.parent for path in models_root.glob("*/training.json") if path.is_file()),
         key=lambda path: path.name,
         reverse=True,
     )
@@ -274,9 +276,7 @@ def _render_results(transformer_root: Path, project_root: Path) -> None:
     cards[4].metric("特徵數", int(model_config.get("input_features", 0)))
     cards[5].metric("訓練時間", _duration_text(summary.get("duration_seconds")))
     mtf_features = [
-        column
-        for column in summary.get("feature_columns", [])
-        if str(column).startswith("mtf_")
+        column for column in summary.get("feature_columns", []) if str(column).startswith("mtf_")
     ]
     if mtf_features:
         st.success(f"這是多週期 Transformer，共使用 {len(mtf_features)} 個跨週期欄位。")
@@ -330,20 +330,14 @@ def _render_inference(
     model_training_active: bool,
 ) -> None:
     """把正式模型預測與 latent 向量寫回 Step 3 特徵檔。"""
-    runs = [
-        run
-        for run in _list_model_runs(transformer_root)
-        if (run / "best_model.pt").exists()
-    ]
+    runs = [run for run in _list_model_runs(transformer_root) if (run / "best_model.pt").exists()]
     if not runs:
         st.warning("請先完成至少一次 Transformer 訓練。")
         return
     files = [
         path
         for path in list_processed_files(processed_dir)
-        if path.name.startswith(
-            "features_mtf_crypto_binance_futures_BTC-USDT_15m_"
-        )
+        if path.name.startswith("features_mtf_crypto_binance_futures_BTC-USDT_15m_")
     ]
     if not files:
         st.warning("請先建立 Step 3 特徵 CSV。")
@@ -363,17 +357,14 @@ def _render_inference(
     trained_paths: set[str] = set()
     model_uses_multitimeframe = False
     try:
-        summary = json.loads(
-            (selected_run / "training.json").read_text(encoding="utf-8")
-        )
+        summary = json.loads((selected_run / "training.json").read_text(encoding="utf-8"))
         for source in summary.get("sources", []):
             interval = str(source.get("interval", "")).lower()
             if interval:
                 trained_intervals.add(interval)
             trained_paths.add(str(Path(str(source.get("path", ""))).resolve()).lower())
         model_uses_multitimeframe = any(
-            str(column).startswith("mtf_")
-            for column in summary.get("feature_columns", [])
+            str(column).startswith("mtf_") for column in summary.get("feature_columns", [])
         )
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         pass
@@ -386,14 +377,11 @@ def _render_inference(
         except (OSError, ValueError, IndexError):
             continue
         if (
-            (not trained_intervals or interval in trained_intervals)
-            and file_uses_multitimeframe == model_uses_multitimeframe
-        ):
+            not trained_intervals or interval in trained_intervals
+        ) and file_uses_multitimeframe == model_uses_multitimeframe:
             compatible_files.append(path)
     default_files = [
-        path
-        for path in compatible_files
-        if str(path.resolve()).lower() in trained_paths
+        path for path in compatible_files if str(path.resolve()).lower() in trained_paths
     ]
     if not default_files:
         default_files = compatible_files[: min(7, len(compatible_files))]
@@ -441,14 +429,14 @@ def _render_inference(
         overall = st.progress(0.0, text="準備推論")
         rows: list[dict[str, object]] = []
         for file_index, path in enumerate(selected_files):
+
             def update_file_progress(payload: dict[str, object]) -> None:
                 local = float(payload.get("progress", 0.0))
                 fraction = (file_index + local) / len(selected_files)
                 overall.progress(
                     min(max(fraction, 0.0), 1.0),
                     text=(
-                        f"{path.name} · Batch "
-                        f"{payload.get('batch', 0)}/{payload.get('batches', 0)}"
+                        f"{path.name} · Batch {payload.get('batch', 0)}/{payload.get('batches', 0)}"
                     ),
                 )
 
@@ -503,9 +491,7 @@ def _render_training_form(
     files = [
         path
         for path in files
-        if path.name.startswith(
-            "features_mtf_crypto_binance_futures_BTC-USDT_15m_"
-        )
+        if path.name.startswith("features_mtf_crypto_binance_futures_BTC-USDT_15m_")
         and "transformer_" not in path.name
     ]
     if not files:
@@ -527,8 +513,10 @@ def _render_training_form(
     uses_multitimeframe = bool(selected_files) and all(
         path.name.startswith("features_mtf_") for path in selected_files
     )
-    if selected_files and not uses_multitimeframe and any(
-        path.name.startswith("features_mtf_") for path in selected_files
+    if (
+        selected_files
+        and not uses_multitimeframe
+        and any(path.name.startswith("features_mtf_") for path in selected_files)
     ):
         st.warning("單週期與多週期資料不可放在同一次 Transformer 訓練。")
     mtf_intervals: set[str] = set()
@@ -543,9 +531,7 @@ def _render_training_form(
                 continue
             mtf_intervals.update(
                 value
-                for value in str(
-                    preview.iloc[0].get("mtf_source_intervals", "")
-                ).split("|")
+                for value in str(preview.iloc[0].get("mtf_source_intervals", "")).split("|")
                 if value
             )
             mtf_feature_count = max(
@@ -708,6 +694,20 @@ def _render_training_form(
             saved.transformer.patch_stride,
             1,
         )
+        hierarchical_controls = st.columns(2)
+        hierarchical_direction = hierarchical_controls[0].toggle(
+            "階層式方向預測",
+            value=saved.transformer.hierarchical_direction,
+            help="先判斷是否值得交易，再判斷多空方向；正式短線模型建議開啟。",
+        )
+        horizon_adapter_dim = hierarchical_controls[1].number_input(
+            "Horizon adapter 維度",
+            1,
+            512,
+            max(saved.transformer.horizon_adapter_dim, 64),
+            1,
+            disabled=not hierarchical_direction,
+        )
 
     st.subheader("訓練設定")
     training = st.columns(4)
@@ -747,11 +747,7 @@ def _render_training_form(
     device = runtime[0].selectbox(
         "訓練裝置",
         device_options,
-        index=(
-            device_options.index(saved_device)
-            if saved_device in device_options
-            else 0
-        ),
+        index=(device_options.index(saved_device) if saved_device in device_options else 0),
     )
     mixed_precision = runtime[1].toggle(
         "混合精度",
@@ -930,6 +926,56 @@ def _render_training_form(
             value=saved.transformer_training.probability_calibration,
             help="建議開啟；只使用驗證集估計溫度，不會接觸測試集。",
         )
+    with st.expander("Checkpoint 選模與特徵去重"):
+        selection = st.columns(4)
+        checkpoint_options = [
+            "deployment_horizon_skill_score",
+            "hierarchical_skill_score",
+            "direction_skill_score",
+            "cost_aware_direction_balanced_accuracy",
+            "validation_loss",
+        ]
+        saved_metric = saved.transformer_training.checkpoint_metric
+        checkpoint_metric = selection[0].selectbox(
+            "最佳模型指標",
+            checkpoint_options,
+            index=(
+                checkpoint_options.index(saved_metric) if saved_metric in checkpoint_options else 0
+            ),
+            help="部署導向指標會依各預測週期權重選擇 checkpoint。",
+        )
+        horizon_weights = selection[1].text_input(
+            "週期權重",
+            value=(
+                ",".join(map(str, saved.transformer_training.checkpoint_horizon_weights))
+                or "0.50,0.35,0.15"
+            ),
+            help="順序需與報酬預測週期一致；15m 短線建議 5/20/48 使用 0.50/0.35/0.15。",
+        )
+        drop_constant_features = selection[2].toggle(
+            "移除常數特徵",
+            value=saved.transformer_training.drop_constant_features,
+        )
+        correlation_filter = selection[3].toggle(
+            "移除高度相關特徵",
+            value=saved.transformer_training.max_feature_correlation is not None,
+        )
+        correlation = st.columns(2)
+        max_feature_correlation = correlation[0].number_input(
+            "最大絕對相關係數",
+            0.90,
+            1.00,
+            float(saved.transformer_training.max_feature_correlation or 0.985),
+            0.005,
+            disabled=not correlation_filter,
+        )
+        correlation_sample_rows = correlation[1].number_input(
+            "相關性估計最多列數",
+            100,
+            1_000_000,
+            saved.transformer_training.correlation_sample_rows,
+            1_000,
+        )
 
     if st.button(
         "開始快速驗證" if quick_test else "開始 Transformer 訓練",
@@ -939,9 +985,7 @@ def _render_training_form(
         disabled=model_training_active or not selected_files,
     ):
         try:
-            if any(
-                path.name.startswith("features_mtf_") for path in selected_files
-            ) != all(
+            if any(path.name.startswith("features_mtf_") for path in selected_files) != all(
                 path.name.startswith("features_mtf_") for path in selected_files
             ):
                 raise ValueError("同一次訓練不可混用單週期與多週期資料")
@@ -961,6 +1005,8 @@ def _render_training_form(
                 quantile_levels=_parse_quantiles(str(quantile_levels)),
                 patch_size=int(patch_size),
                 patch_stride=int(patch_stride),
+                hierarchical_direction=bool(hierarchical_direction),
+                horizon_adapter_dim=(int(horizon_adapter_dim) if hierarchical_direction else 0),
             )
             training_config = TransformerTrainingConfig(
                 epochs=int(epochs),
@@ -987,14 +1033,19 @@ def _render_training_form(
                 max_rows_per_source=(int(max_rows) if int(max_rows) > 0 else None),
                 fee_bps_per_side=float(fee_bps),
                 slippage_bps_per_side=float(slippage_bps),
-                max_observed_spread_bps=(
-                    saved.transformer_training.max_observed_spread_bps
-                ),
+                max_observed_spread_bps=(saved.transformer_training.max_observed_spread_bps),
                 edge_loss_weight=float(edge_weight),
                 excursion_loss_weight=float(excursion_weight),
                 tradeability_loss_weight=float(tradeability_weight),
                 volatility_regime_loss_weight=float(volatility_regime_weight),
                 probability_calibration=bool(probability_calibration),
+                checkpoint_metric=str(checkpoint_metric),
+                checkpoint_horizon_weights=_parse_horizon_weights(str(horizon_weights)),
+                drop_constant_features=bool(drop_constant_features),
+                max_feature_correlation=(
+                    float(max_feature_correlation) if correlation_filter else None
+                ),
+                correlation_sample_rows=int(correlation_sample_rows),
             )
             pipeline = AIPipelineConfig(
                 schema_version=saved.schema_version,

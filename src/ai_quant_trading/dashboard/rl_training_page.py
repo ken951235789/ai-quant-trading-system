@@ -142,9 +142,7 @@ def _result_research_experiments(rl_dir: Path, project_root: Path) -> list[Path]
     for root in roots:
         for experiment in list_rl_research_experiments(root):
             try:
-                source = _read_json(experiment / "summary.json").get(
-                    "source_environment", ""
-                )
+                source = _read_json(experiment / "summary.json").get("source_environment", "")
             except (OSError, ValueError, TypeError):
                 continue
             key = f"{Path(str(source)).name}:{experiment.name}"
@@ -398,13 +396,9 @@ def _render_rl_job_monitor(rl_dir: Path, project_root: Path) -> None:
     metrics = raw_metrics if isinstance(raw_metrics, dict) else {}
     metric_columns = st.columns(5)
     metric_columns[0].metric("完成度", f"{fraction:.1%}")
-    metric_columns[1].metric(
-        "速度", f"{float(metrics.get('steps_per_second', 0)):,.0f} 步／秒"
-    )
+    metric_columns[1].metric("速度", f"{float(metrics.get('steps_per_second', 0)):,.0f} 步／秒")
     metric_columns[2].metric("預估剩餘", _duration_text(metrics.get("eta_seconds")))
-    metric_columns[3].metric(
-        "近期 Reward", f"{float(metrics.get('recent_reward_mean', 0)):.5f}"
-    )
+    metric_columns[3].metric("近期 Reward", f"{float(metrics.get('recent_reward_mean', 0)):.5f}")
     evaluation_reward = metrics.get("evaluation_reward")
     metric_columns[4].metric(
         "驗證 Reward",
@@ -684,10 +678,7 @@ def _render_research_result(
     metrics[4].metric("最差回撤", f"{float(summary.get('worst_max_drawdown', 0)):.2%}")
     metrics[5].metric("成本中位數", f"{float(summary.get('median_cost_to_capital', 0)):.2%}")
     if summary.get("eligible"):
-        st.success(
-            "此實驗已通過多 seed、Walk-forward 與獨立 final holdout，"
-            "可進入模擬倉驗證。"
-        )
+        st.success("此實驗已通過多 seed、Walk-forward 與獨立 final holdout，可進入模擬倉驗證。")
     else:
         st.warning("目前不可升級為 Champion：" + "；".join(summary.get("reasons", [])))
 
@@ -828,9 +819,7 @@ def render_rl_training(rl_dir: Path, project_root: Path) -> None:
     compatible_environments: list[Path] = []
     for environment in environments:
         try:
-            payload = json.loads(
-                (environment / "environment.json").read_text(encoding="utf-8")
-            )
+            payload = json.loads((environment / "environment.json").read_text(encoding="utf-8"))
             source = dict(payload.get("source", {}))
             if (
                 str(source.get("exchange", "")).lower() == "binance_futures"
@@ -964,9 +953,7 @@ def render_rl_training(rl_dir: Path, project_root: Path) -> None:
             )
         try:
             run_count = len(parse_seed_list(research_seeds)) * int(research_folds)
-            st.caption(
-                f"本次會串行訓練 {run_count} 個模型；每一個都使用上方的訓練步數。"
-            )
+            st.caption(f"本次會串行訓練 {run_count} 個模型；每一個都使用上方的訓練步數。")
         except ValueError as exc:
             st.warning(str(exc))
 
@@ -1064,11 +1051,11 @@ def render_rl_training(rl_dir: Path, project_root: Path) -> None:
             row1 = st.columns(6)
             with row1[0]:
                 sac_values["buffer_size"] = st.number_input(
-                    "Replay buffer", 100, 100_000_000, 200_000, 10_000, key="rl_sac_buffer"
+                    "Replay buffer", 100, 100_000_000, 400_000, 10_000, key="rl_sac_buffer"
                 )
             with row1[1]:
                 sac_values["learning_starts"] = st.number_input(
-                    "Learning starts", 0, 100_000_000, 5_000, 1_000, key="rl_sac_starts"
+                    "Learning starts", 0, 100_000_000, 20_000, 1_000, key="rl_sac_starts"
                 )
             with row1[2]:
                 sac_values["tau"] = st.number_input(
@@ -1092,7 +1079,9 @@ def render_rl_training(rl_dir: Path, project_root: Path) -> None:
                     "N-step return", 1, 1_000, 1, 1, key="rl_sac_n_steps"
                 )
             with row2[1]:
-                sac_values["ent_coef"] = st.text_input("Entropy coef", "auto", key="rl_sac_ent")
+                sac_values["ent_coef"] = st.text_input(
+                    "Entropy coef", "auto_0.01", key="rl_sac_ent"
+                )
             with row2[2]:
                 sac_values["target_entropy"] = st.text_input(
                     "Target entropy", "auto", key="rl_sac_target_entropy"
@@ -1118,11 +1107,13 @@ def render_rl_training(rl_dir: Path, project_root: Path) -> None:
                 )
             with row3[2]:
                 sac_values["action_noise"] = st.selectbox(
-                    "Action noise", ["none", "normal", "ornstein_uhlenbeck"], key="rl_sac_noise"
+                    "Action noise",
+                    ["normal", "none", "ornstein_uhlenbeck"],
+                    key="rl_sac_noise",
                 )
             with row3[3]:
                 sac_values["action_noise_sigma"] = st.number_input(
-                    "Noise sigma", 0.0, 10.0, 0.1, 0.05, key="rl_sac_sigma"
+                    "Noise sigma", 0.0, 10.0, 0.05, 0.01, key="rl_sac_sigma"
                 )
             with row3[4]:
                 sac_values["save_replay_buffer"] = st.toggle(
@@ -1173,9 +1164,7 @@ def render_rl_training(rl_dir: Path, project_root: Path) -> None:
     )
     training_active = activity is not None
     if activity is not None:
-        st.info(
-            f"{activity.label}正在執行；目前調整的參數只會套用到下一次工作。"
-        )
+        st.info(f"{activity.label}正在執行；目前調整的參數只會套用到下一次工作。")
 
     if st.button(
         "開始穩健性實驗" if robust_mode else "開始訓練",
@@ -1215,8 +1204,8 @@ def render_rl_training(rl_dir: Path, project_root: Path) -> None:
                 ppo_use_sde=bool(ppo_values.get("use_sde", False)),
                 ppo_sde_sample_freq=int(ppo_values.get("sde_sample_freq", -1)),
                 ppo_target_kl=ppo_values.get("target_kl"),
-                sac_buffer_size=int(sac_values.get("buffer_size", 200_000)),
-                sac_learning_starts=int(sac_values.get("learning_starts", 5_000)),
+                sac_buffer_size=int(sac_values.get("buffer_size", 400_000)),
+                sac_learning_starts=int(sac_values.get("learning_starts", 20_000)),
                 sac_tau=float(sac_values.get("tau", 0.005)),
                 sac_train_freq=int(sac_values.get("train_freq", 1)),
                 sac_train_freq_unit=str(sac_values.get("train_freq_unit", "step")),
@@ -1224,7 +1213,7 @@ def render_rl_training(rl_dir: Path, project_root: Path) -> None:
                 sac_optimize_memory_usage=bool(sac_values.get("optimize_memory_usage", False)),
                 sac_n_steps=int(sac_values.get("n_steps", 1)),
                 sac_ent_coef=_parse_auto_number(
-                    str(sac_values.get("ent_coef", "auto")), "Entropy coef"
+                    str(sac_values.get("ent_coef", "auto_0.01")), "Entropy coef"
                 ),
                 sac_target_update_interval=int(sac_values.get("target_update_interval", 1)),
                 sac_target_entropy=_parse_auto_number(
@@ -1235,8 +1224,8 @@ def render_rl_training(rl_dir: Path, project_root: Path) -> None:
                 sac_use_sde=bool(sac_values.get("use_sde", False)),
                 sac_sde_sample_freq=int(sac_values.get("sde_sample_freq", -1)),
                 sac_use_sde_at_warmup=bool(sac_values.get("use_sde_at_warmup", False)),
-                sac_action_noise=str(sac_values.get("action_noise", "none")),
-                sac_action_noise_sigma=float(sac_values.get("action_noise_sigma", 0.1)),
+                sac_action_noise=str(sac_values.get("action_noise", "normal")),
+                sac_action_noise_sigma=float(sac_values.get("action_noise_sigma", 0.05)),
             )
             research_config = None
             if robust_mode:

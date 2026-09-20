@@ -10,7 +10,7 @@ import pandas as pd
 from ai_quant_trading.features.market_context import MARKET_CONTEXT_COLUMNS, market_timeframes
 
 
-SHORT_TERM_FEATURE_CONTRACT_VERSION = "btc_short_compact_v2"
+SHORT_TERM_FEATURE_CONTRACT_VERSION = "btc_short_compact_v3"
 SHORT_TERM_FEATURE_BUDGET = 112
 COMPACT_TIMEFRAME_FEATURES = (
     "ema_20_50_atr",
@@ -29,12 +29,20 @@ COMPACT_TIMEFRAME_FEATURES = (
     "candle_body_pct",
 )
 COMPACT_TRANSFORMER_FEATURES = (
-    "u_transformer_return_5",
-    "u_transformer_return_q10_5",
-    "u_transformer_return_q90_5",
-    "u_transformer_net_edge_advantage_5",
-    "u_transformer_expected_best_edge_5",
-    "u_transformer_tradeability_5",
+    *[
+        f"u_transformer_{name}_{horizon}"
+        for horizon in (5, 20, 48)
+        for name in (
+            "return",
+            "return_q10",
+            "return_q90",
+            "net_edge_advantage",
+            "expected_best_edge",
+            "tradeability",
+            "side_direction_edge",
+            "movement_direction_edge",
+        )
+    ],
     "u_transformer_uncertainty",
     "u_transformer_available",
     "u_transformer_execution_signal",
@@ -46,7 +54,6 @@ COMPACT_TRANSFORMER_FEATURES = (
     "u_transformer_no_trade_pressure",
     "u_transformer_volatility",
     "u_transformer_volatility_regime_high_probability",
-    "u_transformer_side_direction_edge_5",
 )
 
 

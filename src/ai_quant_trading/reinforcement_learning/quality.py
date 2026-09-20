@@ -64,6 +64,8 @@ def assess_rl_evaluation_quality(
     max_fee_to_initial_capital: float = 0.02,
     max_action_saturation_ratio: float = 0.98,
     min_profit_factor: float = 1.20,
+    max_flat_exposure_ratio: float = 0.995,
+    min_directional_intent_ratio: float = 0.005,
 ) -> RLEvaluationQualityReport:
     """檢查 final holdout 等不可回頭調參的單一樣本外區間。"""
     if max_drawdown is None:
@@ -78,6 +80,8 @@ def assess_rl_evaluation_quality(
     saturation = _finite_metric(metrics, "action_saturation_ratio")
     profit_factor = _finite_metric(metrics, "profit_factor")
     expectancy = _finite_metric(metrics, "expectancy")
+    flat_exposure_ratio = _finite_metric(metrics, "flat_exposure_ratio")
+    directional_intent_ratio = _finite_metric(metrics, "directional_intent_ratio")
     steps = int(metrics.get("steps") or 0)
     trades = int(metrics.get("trades") or 0)
     liquidation_count = int(metrics.get("liquidation_count") or 0)
@@ -91,6 +95,15 @@ def assess_rl_evaluation_quality(
         reasons.append(f"Final holdout 僅 {steps} 步，至少需要 {min_steps} 步")
     if trades < min_trades:
         reasons.append(f"Final holdout 僅 {trades} 次調倉，至少需要 {min_trades} 次")
+    if flat_exposure_ratio is not None and flat_exposure_ratio >= max_flat_exposure_ratio:
+        reasons.append(f"Final holdout 空手比例 {flat_exposure_ratio:.1%}，策略已退化為近乎全空手")
+    if (
+        directional_intent_ratio is not None
+        and directional_intent_ratio <= min_directional_intent_ratio
+    ):
+        reasons.append(
+            f"Final holdout 方向意圖僅 {directional_intent_ratio:.1%}，不足以驗證交易策略"
+        )
     if sharpe_ratio is None or sharpe_ratio <= min_sharpe_ratio:
         text = "N/A" if sharpe_ratio is None else f"{sharpe_ratio:.2f}"
         reasons.append(f"Final holdout Sharpe {text}，必須大於 {min_sharpe_ratio:.2f}")
@@ -137,6 +150,8 @@ def assess_rl_training_quality(
     max_fee_to_initial_capital: float = 0.02,
     max_action_saturation_ratio: float = 0.98,
     min_test_profit_factor: float = 1.20,
+    max_flat_exposure_ratio: float = 0.995,
+    min_directional_intent_ratio: float = 0.005,
 ) -> RLQualityReport:
     """同時檢查驗證、測試與通用模型的跨市場一致性。"""
     metrics = dict(metadata.get("metrics", {}))
@@ -157,6 +172,8 @@ def assess_rl_training_quality(
     action_saturation_ratio = _finite_metric(test, "action_saturation_ratio")
     test_profit_factor = _finite_metric(test, "profit_factor")
     test_expectancy = _finite_metric(test, "expectancy")
+    flat_exposure_ratio = _finite_metric(test, "flat_exposure_ratio")
+    directional_intent_ratio = _finite_metric(test, "directional_intent_ratio")
     liquidation_count = int(test.get("liquidation_count") or 0)
     test_steps = int(test.get("steps") or 0)
     test_trades = int(test.get("trades") or 0)
@@ -174,6 +191,13 @@ def assess_rl_training_quality(
         reasons.append(f"測試僅 {test_steps} 步，至少需要 {min_test_steps} 步")
     if test_trades < min_test_trades:
         reasons.append(f"測試僅 {test_trades} 次調倉，至少需要 {min_test_trades} 次")
+    if flat_exposure_ratio is not None and flat_exposure_ratio >= max_flat_exposure_ratio:
+        reasons.append(f"測試期空手比例 {flat_exposure_ratio:.1%}，策略已退化為近乎全空手")
+    if (
+        directional_intent_ratio is not None
+        and directional_intent_ratio <= min_directional_intent_ratio
+    ):
+        reasons.append(f"測試期方向意圖僅 {directional_intent_ratio:.1%}，不足以驗證交易策略")
     if positive_market_ratio is not None and positive_market_ratio < min_positive_market_ratio:
         reasons.append(
             f"正報酬市場比例 {positive_market_ratio:.0%}，至少需要 {min_positive_market_ratio:.0%}"

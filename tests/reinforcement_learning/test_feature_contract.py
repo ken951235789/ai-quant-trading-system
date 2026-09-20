@@ -55,6 +55,7 @@ def compact_market_frame(intervals=ALL_TIMEFRAMES, rows=400):
     frame = pd.concat([frame, pd.DataFrame(values, index=frame.index)], axis=1)
     frame["transformer_return_5"] = 0.003
     frame["transformer_return_20"] = -0.02
+    frame["transformer_return_48"] = 0.01
     frame["transformer_available"] = 1.0
     return frame
 
@@ -68,6 +69,8 @@ def test_compact_features_have_balanced_scales_without_duplicate_15m(intervals) 
         columns
     )
     assert all(f"u_{column}" in columns for column in MARKET_CONTEXT_COLUMNS)
+    assert "u_transformer_return_48" in columns
+    assert "u_transformer_tradeability_48" in columns
     counts = [
         sum(column.startswith(f"u_mtf_{interval}_") for column in columns) for interval in intervals
     ]
@@ -168,7 +171,7 @@ def test_expected_return_contract_survives_transformations_and_storage(tmp_path)
         metadata["ai_context"]["expected_return_contract"]["source_column"]
         == "transformer_return_5"
     )
-    assert metadata["feature_contract"]["version"] == "btc_short_compact_v2"
+    assert metadata["feature_contract"]["version"] == "btc_short_compact_v3"
     assert metadata["feature_transform"] == "universal_ratios"
 
 
@@ -201,7 +204,7 @@ def test_new_transformer_environment_requires_explicit_expected_return_contract(
 
 def test_transformer_signal_entropy_retains_opposing_horizons() -> None:
     frame = compact_market_frame()
-    for horizon, side in ((1, "up"), (5, "down"), (20, "neutral")):
+    for horizon, side in ((5, "up"), (20, "down"), (48, "neutral")):
         for name in ("down", "neutral", "up"):
             frame[f"transformer_{name}_probability_{horizon}"] = float(name == side)
     result = add_universal_rl_features(frame)

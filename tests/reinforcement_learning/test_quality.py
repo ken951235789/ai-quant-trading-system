@@ -48,3 +48,17 @@ def test_final_holdout_quality_uses_strict_short_term_limit() -> None:
 
     assert not report.eligible
     assert any("上限為 6%" in reason for reason in report.reasons)
+
+
+def test_quality_rejects_policy_that_is_almost_always_flat() -> None:
+    metadata = _metadata("short_term", 0.02)
+    metadata["metrics"]["test"].update(
+        flat_exposure_ratio=1.0,
+        directional_intent_ratio=0.0,
+    )
+
+    report = assess_rl_training_quality(metadata)
+
+    assert not report.eligible
+    assert any("全空手" in reason for reason in report.reasons)
+    assert any("方向意圖" in reason for reason in report.reasons)

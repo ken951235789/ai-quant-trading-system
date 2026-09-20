@@ -68,9 +68,7 @@ def transformer_backend_status() -> TransformerBackendStatus:
     cuda_available = bool(torch.cuda.is_available())
     device_name = torch.cuda.get_device_name(0) if cuda_available else "CPU"
     total_memory = (
-        torch.cuda.get_device_properties(0).total_memory / (1024**3)
-        if cuda_available
-        else 0.0
+        torch.cuda.get_device_properties(0).total_memory / (1024**3) if cuda_available else 0.0
     )
     return TransformerBackendStatus(
         available=True,
@@ -189,13 +187,15 @@ def _task_loss(
             label_smoothing=config.label_smoothing,
             reduction="none",
         ).reshape_as(targets)
-        true_probability = torch.softmax(logits, dim=-1).gather(
-            -1,
-            targets.unsqueeze(-1),
-        ).squeeze(-1)
-        focal_weight = (1.0 - true_probability).pow(
-            config.direction_focal_gamma
+        true_probability = (
+            torch.softmax(logits, dim=-1)
+            .gather(
+                -1,
+                targets.unsqueeze(-1),
+            )
+            .squeeze(-1)
         )
+        focal_weight = (1.0 - true_probability).pow(config.direction_focal_gamma)
         sample_weight = torch.ones_like(element_loss)
         if direction_class_weights is not None:
             expanded_weights = direction_class_weights.unsqueeze(0).expand(
@@ -220,10 +220,14 @@ def _task_loss(
             label_smoothing=config.label_smoothing,
             reduction="none",
         ).reshape_as(side_targets)
-        side_probability = torch.softmax(side_logits, dim=-1).gather(
-            -1,
-            side_targets.unsqueeze(-1),
-        ).squeeze(-1)
+        side_probability = (
+            torch.softmax(side_logits, dim=-1)
+            .gather(
+                -1,
+                side_targets.unsqueeze(-1),
+            )
+            .squeeze(-1)
+        )
         side_weight = (1.0 - side_probability).pow(config.direction_focal_gamma)
         if side_class_weights is not None:
             expanded_side_weights = side_class_weights.unsqueeze(0).expand(
@@ -237,9 +241,7 @@ def _task_loss(
             ).squeeze(-1)
         # 多空頭只在扣除成本後具交易價值的樣本上學習，Hold 由獨立頭處理。
         side_weight = side_weight * batch["tradeability"]
-        side_loss = (side_element_loss * side_weight).sum() / side_weight.sum().clamp_min(
-            1e-8
-        )
+        side_loss = (side_element_loss * side_weight).sum() / side_weight.sum().clamp_min(1e-8)
     if "quantile_returns" in output:
         levels = torch.tensor(
             model_config.quantile_levels,
@@ -249,8 +251,7 @@ def _task_loss(
         error = batch["future_returns"].unsqueeze(-1) - output["quantile_returns"]
         quantile_loss = torch.maximum((levels - 1) * error, levels * error).mean()
         crossing_loss = nn.functional.relu(
-            output["quantile_returns"][..., :-1]
-            - output["quantile_returns"][..., 1:]
+            output["quantile_returns"][..., :-1] - output["quantile_returns"][..., 1:]
         ).mean()
     if "edge_returns" in output and "edge_returns" in batch:
         edge_loss = nn.functional.smooth_l1_loss(
@@ -390,8 +391,7 @@ def _move_batch(
     device: torch.device,
 ) -> dict[str, torch.Tensor]:
     return {
-        key: value.to(device, non_blocking=device.type == "cuda")
-        for key, value in batch.items()
+        key: value.to(device, non_blocking=device.type == "cuda") for key, value in batch.items()
     }
 
 
@@ -463,8 +463,7 @@ def _temperature_scale(
     if "tradeability_probability" in result:
         probabilities = result["tradeability_probability"].clamp(1e-8, 1 - 1e-8)
         entropy = -(
-            probabilities * probabilities.log()
-            + (1 - probabilities) * (1 - probabilities).log()
+            probabilities * probabilities.log() + (1 - probabilities) * (1 - probabilities).log()
         ).mean(dim=-1) / math.log(2)
         uncertainty_parts.append(entropy)
     if uncertainty_parts:
@@ -616,11 +615,30 @@ def _confusion_scores(confusion: np.ndarray) -> dict[str, float]:
         "accuracy": accuracy,
         "majority_baseline": majority,
         "accuracy_lift": accuracy - majority,
-        "balanced_accuracy": (
-            float(recall[populated].mean()) if populated.any() else 0.0
-        ),
+        "balanced_accuracy": (float(recall[populated].mean()) if populated.any() else 0.0),
         "macro_f1": float(f1[populated].mean()) if populated.any() else 0.0,
     }
+
+
+def _checkpoint_horizon_weights(
+    horizons: tuple[int, ...],
+    configured: tuple[float, ...],
+) -> np.ndarray:
+    """建立部署導向權重；未指定時讓 5／20／48 根依序負責執行、setup 與趨勢。"""
+    if configured:
+        if len(configured) != len(horizons):
+            raise ValueError("checkpoint_horizon_weights 數量必須等於 return_horizons")
+        values = np.asarray(configured, dtype=np.float64)
+    else:
+        preferred = {5: 0.50, 20: 0.35, 48: 0.15}
+        values = np.asarray(
+            [preferred.get(int(horizon), 0.05) for horizon in horizons],
+            dtype=np.float64,
+        )
+    total = float(values.sum())
+    if not np.isfinite(total) or total <= 0:
+        raise ValueError("checkpoint_horizon_weights 加總必須大於 0")
+    return values / total
 
 
 def _evaluate(
@@ -669,9 +687,7 @@ def _evaluate(
             total_items += size
             total_loss += float(loss.item()) * size
             predicted_regime = output["regime_logits"].argmax(dim=-1)
-            correct_regimes += int(
-                (predicted_regime == moved["regime"]).sum().item()
-            )
+            correct_regimes += int((predicted_regime == moved["regime"]).sum().item())
             if "direction_probability" in output:
                 predicted_direction = output["direction_probability"].argmax(dim=-1)
                 correct_directions += int(
@@ -685,11 +701,7 @@ def _evaluate(
                         + predicted_direction[:, horizon_index]
                     )
                     direction_confusion[horizon_index] += (
-                        torch.bincount(encoded, minlength=9)
-                        .reshape(3, 3)
-                        .detach()
-                        .cpu()
-                        .numpy()
+                        torch.bincount(encoded, minlength=9).reshape(3, 3).detach().cpu().numpy()
                     )
             if "movement_probability" in output:
                 predicted_movement = output["movement_probability"].argmax(dim=-1)
@@ -699,8 +711,7 @@ def _evaluate(
                 tradeable = moved["tradeability"] > 0.5
                 for horizon_index in range(horizon_count):
                     movement_encoded = (
-                        actual_movement[:, horizon_index] * 3
-                        + predicted_movement[:, horizon_index]
+                        actual_movement[:, horizon_index] * 3 + predicted_movement[:, horizon_index]
                     )
                     movement_confusion[horizon_index] += (
                         torch.bincount(movement_encoded, minlength=9)
@@ -723,28 +734,20 @@ def _evaluate(
                             .numpy()
                         )
             if collect_predictions:
-                predicted_returns_z = (
-                    output["future_returns"].detach().cpu().numpy()
-                )
+                predicted_returns_z = output["future_returns"].detach().cpu().numpy()
                 actual_returns_z = moved["future_returns"].detach().cpu().numpy()
-                predicted_volatility_z = (
-                    output["volatility"].detach().cpu().numpy()
-                )
+                predicted_volatility_z = output["volatility"].detach().cpu().numpy()
                 actual_volatility_z = moved["volatility"].detach().cpu().numpy()
                 if scaler is not None:
                     return_means = np.asarray(scaler.return_means)
                     return_scales = np.asarray(scaler.return_scales)
-                    predicted_returns = (
-                        predicted_returns_z * return_scales + return_means
-                    )
+                    predicted_returns = predicted_returns_z * return_scales + return_means
                     actual_returns = actual_returns_z * return_scales + return_means
                     predicted_volatility = (
-                        predicted_volatility_z * scaler.volatility_scale
-                        + scaler.volatility_mean
+                        predicted_volatility_z * scaler.volatility_scale + scaler.volatility_mean
                     )
                     actual_volatility = (
-                        actual_volatility_z * scaler.volatility_scale
-                        + scaler.volatility_mean
+                        actual_volatility_z * scaler.volatility_scale + scaler.volatility_mean
                     )
                 else:
                     predicted_returns = predicted_returns_z
@@ -778,8 +781,7 @@ def _evaluate(
                 )
                 if quantile_returns is not None and scaler is not None:
                     quantile_returns = (
-                        quantile_returns
-                        * np.asarray(scaler.return_scales)[None, :, None]
+                        quantile_returns * np.asarray(scaler.return_scales)[None, :, None]
                         + np.asarray(scaler.return_means)[None, :, None]
                     )
                 edge_returns = (
@@ -793,14 +795,10 @@ def _evaluate(
                     else None
                 )
                 excursions = (
-                    output["excursions"].detach().cpu().numpy()
-                    if "excursions" in output
-                    else None
+                    output["excursions"].detach().cpu().numpy() if "excursions" in output else None
                 )
                 actual_excursions = (
-                    moved["excursions"].detach().cpu().numpy()
-                    if "excursions" in moved
-                    else None
+                    moved["excursions"].detach().cpu().numpy() if "excursions" in moved else None
                 )
                 if edge_returns is not None and scaler is not None:
                     edge_means = np.asarray(scaler.edge_means).reshape(-1, 2)
@@ -840,16 +838,12 @@ def _evaluate(
                     row: dict[str, float | int] = {
                         "actual_regime": int(regimes[index]),
                         "predicted_regime": int(predicted_regimes[index]),
-                        "predicted_volatility": float(
-                            predicted_volatility[index, 0]
-                        ),
+                        "predicted_volatility": float(predicted_volatility[index, 0]),
                         "actual_volatility": float(actual_volatility[index, 0]),
                         "uncertainty": float(uncertainty[index]),
                     }
                     if volatility_regime_probability is not None:
-                        row["actual_volatility_regime"] = int(
-                            actual_volatility_regime[index]
-                        )
+                        row["actual_volatility_regime"] = int(actual_volatility_regime[index])
                         for class_index, name in enumerate(("low", "normal", "high")):
                             row[f"volatility_regime_{name}_probability"] = float(
                                 volatility_regime_probability[index, class_index]
@@ -885,9 +879,7 @@ def _evaluate(
                             row[f"actual_movement_{horizon}"] = int(
                                 actual_movements[index, horizon_index]
                             )
-                            for class_index, name in enumerate(
-                                ("down", "neutral", "up")
-                            ):
+                            for class_index, name in enumerate(("down", "neutral", "up")):
                                 row[f"movement_{name}_probability_{horizon}"] = float(
                                     movement_probabilities[
                                         index,
@@ -895,9 +887,7 @@ def _evaluate(
                                         class_index,
                                     ]
                                 )
-                            row[f"actual_side_{horizon}"] = int(
-                                actual_sides[index, horizon_index]
-                            )
+                            row[f"actual_side_{horizon}"] = int(actual_sides[index, horizon_index])
                             row[f"side_down_probability_{horizon}"] = float(
                                 side_probabilities[index, horizon_index, 0]
                             )
@@ -905,9 +895,7 @@ def _evaluate(
                                 side_probabilities[index, horizon_index, 1]
                             )
                         if quantile_returns is not None:
-                            for quantile_index, level in enumerate(
-                                model.config.quantile_levels
-                            ):
+                            for quantile_index, level in enumerate(model.config.quantile_levels):
                                 token = int(round(level * 100))
                                 row[f"predicted_return_q{token}_{horizon}"] = float(
                                     quantile_returns[
@@ -948,9 +936,7 @@ def _evaluate(
         "regime_accuracy": correct_regimes / total_items,
     }
     if direction_items:
-        metrics["cost_aware_direction_accuracy"] = (
-            correct_directions / direction_items
-        )
+        metrics["cost_aware_direction_accuracy"] = correct_directions / direction_items
         balanced_values: list[float] = []
         macro_f1_values: list[float] = []
         majority_values: list[float] = []
@@ -1004,14 +990,31 @@ def _evaluate(
             + 0.25 * metrics["direction_accuracy_lift"]
             - config.checkpoint_loss_penalty * metrics["loss"]
         )
+        horizon_weights = _checkpoint_horizon_weights(
+            model.config.return_horizons,
+            config.checkpoint_horizon_weights,
+        )
+        weighted_balanced = float(np.dot(horizon_weights, balanced_values))
+        weighted_lift = float(
+            np.dot(
+                horizon_weights,
+                np.asarray(accuracy_values) - np.asarray(majority_values),
+            )
+        )
+        metrics["deployment_direction_balanced_accuracy"] = weighted_balanced
+        metrics["deployment_direction_accuracy_lift"] = weighted_lift
+        for horizon, weight in zip(
+            model.config.return_horizons,
+            horizon_weights,
+            strict=True,
+        ):
+            metrics[f"checkpoint_horizon_weight_{horizon}"] = float(weight)
         if model.config.hierarchical_direction:
             movement_balanced: list[float] = []
             movement_lifts: list[float] = []
             side_balanced: list[float] = []
             for horizon_index, horizon in enumerate(model.config.return_horizons):
-                movement_scores = _confusion_scores(
-                    movement_confusion[horizon_index]
-                )
+                movement_scores = _confusion_scores(movement_confusion[horizon_index])
                 side_scores = _confusion_scores(side_confusion[horizon_index])
                 for name, value in movement_scores.items():
                     metrics[f"movement_{name}_{horizon}"] = value
@@ -1020,13 +1023,9 @@ def _evaluate(
                 movement_balanced.append(movement_scores["balanced_accuracy"])
                 movement_lifts.append(movement_scores["accuracy_lift"])
                 side_balanced.append(side_scores["balanced_accuracy"])
-            metrics["movement_balanced_accuracy"] = float(
-                np.mean(movement_balanced)
-            )
+            metrics["movement_balanced_accuracy"] = float(np.mean(movement_balanced))
             metrics["movement_accuracy_lift"] = float(np.mean(movement_lifts))
-            metrics["conditional_side_balanced_accuracy"] = float(
-                np.mean(side_balanced)
-            )
+            metrics["conditional_side_balanced_accuracy"] = float(np.mean(side_balanced))
             metrics["hierarchical_skill_score"] = (
                 0.60 * balanced_accuracy
                 + 0.20 * metrics["movement_balanced_accuracy"]
@@ -1034,36 +1033,51 @@ def _evaluate(
                 + 0.25 * metrics["direction_accuracy_lift"]
                 - config.checkpoint_loss_penalty * metrics["loss"]
             )
+            weighted_movement = float(np.dot(horizon_weights, movement_balanced))
+            weighted_side = float(np.dot(horizon_weights, side_balanced))
+            metrics["deployment_movement_balanced_accuracy"] = weighted_movement
+            metrics["deployment_conditional_side_balanced_accuracy"] = weighted_side
+            metrics["deployment_horizon_skill_score"] = (
+                0.60 * weighted_balanced
+                + 0.20 * weighted_movement
+                + 0.20 * weighted_side
+                + 0.25 * weighted_lift
+                - config.checkpoint_loss_penalty * metrics["loss"]
+            )
+        else:
+            metrics["deployment_horizon_skill_score"] = (
+                weighted_balanced
+                + 0.25 * weighted_lift
+                - config.checkpoint_loss_penalty * metrics["loss"]
+            )
     if collect_predictions and not prediction_frame.empty:
         predicted_columns = [
             column
             for column in prediction_frame
-            if column.startswith("predicted_return_")
-            and "_q" not in column
+            if column.startswith("predicted_return_") and "_q" not in column
         ]
-        actual_columns = [
-            column.replace("predicted_", "actual_")
-            for column in predicted_columns
-        ]
+        actual_columns = [column.replace("predicted_", "actual_") for column in predicted_columns]
         predicted = prediction_frame[predicted_columns].to_numpy()
         actual = prediction_frame[actual_columns].to_numpy()
         metrics["return_mae"] = float(np.mean(np.abs(predicted - actual)))
-        metrics["direction_accuracy"] = float(
-            np.mean(np.sign(predicted) == np.sign(actual))
-        )
+        metrics["direction_accuracy"] = float(np.mean(np.sign(predicted) == np.sign(actual)))
         metrics["volatility_mae"] = float(
             np.mean(
                 np.abs(
-                    prediction_frame["predicted_volatility"]
-                    - prediction_frame["actual_volatility"]
+                    prediction_frame["predicted_volatility"] - prediction_frame["actual_volatility"]
                 )
             )
         )
         edge_columns = [
-            column for column in prediction_frame if column.startswith("predicted_long_edge_") or column.startswith("predicted_short_edge_")
+            column
+            for column in prediction_frame
+            if column.startswith("predicted_long_edge_")
+            or column.startswith("predicted_short_edge_")
         ]
         if edge_columns:
-            actual_edge_columns = [column.replace("predicted_", "actual_") for column in edge_columns]
+            actual_edge_columns = [
+                column.replace("predicted_", "actual_") for column in edge_columns
+            ]
             metrics["cost_aware_edge_mae"] = float(
                 np.mean(
                     np.abs(
@@ -1076,7 +1090,10 @@ def _evaluate(
             column for column in prediction_frame if column.startswith("tradeability_probability_")
         ]
         if trade_columns:
-            actual_trade_columns = [column.replace("tradeability_probability_", "actual_tradeability_") for column in trade_columns]
+            actual_trade_columns = [
+                column.replace("tradeability_probability_", "actual_tradeability_")
+                for column in trade_columns
+            ]
             predicted_tradeability = prediction_frame[trade_columns].to_numpy()
             actual_tradeability_values = prediction_frame[actual_trade_columns].to_numpy()
             metrics["tradeability_brier"] = float(
@@ -1104,14 +1121,10 @@ def _checkpoint_payload(
         "model_config": model_config.to_dict(),
         "training_config": training_config.to_dict(),
         "feature_columns": list(data.scaler.feature_columns),
-        "feature_contract": build_transformer_feature_contract(
-            data.scaler.feature_columns
-        ),
+        "feature_contract": build_transformer_feature_contract(data.scaler.feature_columns),
         "scaler": data.scaler.to_dict(),
         "sources": [source.to_dict() for source in data.sources],
-        "state_dict": {
-            key: value.detach().cpu() for key, value in model.state_dict().items()
-        },
+        "state_dict": {key: value.detach().cpu() for key, value in model.state_dict().items()},
     }
 
 
@@ -1125,6 +1138,10 @@ def train_temporal_transformer(
     progress_callback: ProgressCallback | None = None,
 ) -> TransformerTrainingResult:
     """執行一次完整訓練，保存最佳模型並在最後評估時間外測試集。"""
+    if training_config.checkpoint_horizon_weights and len(
+        training_config.checkpoint_horizon_weights
+    ) != len(model_config.return_horizons):
+        raise ValueError("checkpoint_horizon_weights 數量必須等於 return_horizons")
     started = monotonic()
     configure_torch_cpu_threads(training_config.cpu_threads)
     _set_seed(training_config.seed)
@@ -1140,9 +1157,7 @@ def train_temporal_transformer(
         side_weights_array,
         tradeability_weights_array,
         class_balance,
-    ) = (
-        _training_class_balance(data, training_config)
-    )
+    ) = _training_class_balance(data, training_config)
     direction_class_weights = torch.tensor(
         direction_weights_array,
         dtype=torch.float32,
@@ -1158,10 +1173,13 @@ def train_temporal_transformer(
         dtype=torch.float32,
         device=device,
     )
-    safe_name = "".join(
-        character if character.isalnum() or character in {"-", "_"} else "_"
-        for character in run_name.strip()
-    ).strip("_") or "transformer"
+    safe_name = (
+        "".join(
+            character if character.isalnum() or character in {"-", "_"} else "_"
+            for character in run_name.strip()
+        ).strip("_")
+        or "transformer"
+    )
     run_dir = Path(output_root).resolve() / f"{_utc_stamp()}_{safe_name}"
     run_dir.mkdir(parents=True, exist_ok=False)
     history_csv = run_dir / "history.csv"
@@ -1266,8 +1284,7 @@ def train_temporal_transformer(
                 epoch_loss += float(loss.item()) * size
                 completed_steps += 1
                 if progress_callback and (
-                    batch_index % report_every == 0
-                    or batch_index == len(train_loader)
+                    batch_index % report_every == 0 or batch_index == len(train_loader)
                 ):
                     elapsed = monotonic() - started
                     fraction = completed_steps / total_steps
@@ -1289,26 +1306,14 @@ def train_temporal_transformer(
                             "metrics": {
                                 "train_loss": epoch_loss / epoch_items,
                                 "return_loss": float(losses["return_loss"].item()),
-                                "volatility_loss": float(
-                                    losses["volatility_loss"].item()
-                                ),
-                                "regime_loss": float(
-                                    losses["regime_loss"].item()
-                                ),
-                                "direction_loss": float(
-                                    losses["direction_loss"].item()
-                                ),
+                                "volatility_loss": float(losses["volatility_loss"].item()),
+                                "regime_loss": float(losses["regime_loss"].item()),
+                                "direction_loss": float(losses["direction_loss"].item()),
                                 "side_loss": float(losses["side_loss"].item()),
-                                "quantile_loss": float(
-                                    losses["quantile_loss"].item()
-                                ),
+                                "quantile_loss": float(losses["quantile_loss"].item()),
                                 "edge_loss": float(losses["edge_loss"].item()),
-                                "excursion_loss": float(
-                                    losses["excursion_loss"].item()
-                                ),
-                                "tradeability_loss": float(
-                                    losses["tradeability_loss"].item()
-                                ),
+                                "excursion_loss": float(losses["excursion_loss"].item()),
+                                "tradeability_loss": float(losses["tradeability_loss"].item()),
                                 "volatility_regime_loss": float(
                                     losses["volatility_regime_loss"].item()
                                 ),
@@ -1346,9 +1351,7 @@ def train_temporal_transformer(
                     "epoch": epoch_index + 1,
                     "train_loss": train_loss,
                     "validation_loss": validation_loss,
-                    "validation_regime_accuracy": validation_metrics[
-                        "regime_accuracy"
-                    ],
+                    "validation_regime_accuracy": validation_metrics["regime_accuracy"],
                     "validation_cost_aware_direction_accuracy": validation_metrics.get(
                         "cost_aware_direction_accuracy",
                         0.0,
@@ -1371,6 +1374,10 @@ def train_temporal_transformer(
                     ),
                     "validation_direction_skill_score": validation_metrics.get(
                         "direction_skill_score",
+                        0.0,
+                    ),
+                    "validation_deployment_horizon_skill_score": validation_metrics.get(
+                        "deployment_horizon_skill_score",
                         0.0,
                     ),
                     "validation_movement_balanced_accuracy": validation_metrics.get(
@@ -1436,9 +1443,7 @@ def train_temporal_transformer(
                         "metrics": {
                             "train_loss": train_loss,
                             "validation_loss": validation_loss,
-                            "validation_regime_accuracy": validation_metrics[
-                                "regime_accuracy"
-                            ],
+                            "validation_regime_accuracy": validation_metrics["regime_accuracy"],
                             "validation_cost_aware_direction_accuracy": (
                                 validation_metrics.get(
                                     "cost_aware_direction_accuracy",
@@ -1544,9 +1549,7 @@ def train_temporal_transformer(
                             history[-1]["validation_regime_accuracy"]
                         ),
                         "validation_cost_aware_direction_accuracy": float(
-                            history[-1][
-                                "validation_cost_aware_direction_accuracy"
-                            ]
+                            history[-1]["validation_cost_aware_direction_accuracy"]
                         ),
                         "test_loss": test_metrics["loss"],
                         "test_regime_accuracy": test_metrics["regime_accuracy"],

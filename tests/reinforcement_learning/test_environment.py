@@ -11,6 +11,7 @@ from ai_quant_trading.reinforcement_learning import (
     DiscretePortfolioActionWrapper,
     PortfolioEnvConfig,
     PortfolioTradingEnv,
+    map_continuous_action,
     run_environment_diagnostic,
 )
 
@@ -399,6 +400,25 @@ def test_sac_hold_close_semantics_waits_when_already_flat() -> None:
     assert info["action_intent"] == "WAIT_FLAT"
     assert info["side"] == "HOLD"
     assert info["trade_notional"] == 0.0
+
+
+def test_sac_continuous_target_keeps_small_deadband_without_large_flat_zone() -> None:
+    config = _perpetual_config(
+        action_semantics="continuous_target",
+        rebalance_deadband=0.01,
+        neutral_action_threshold=0.0,
+    )
+
+    ignored_target, ignored_intent = map_continuous_action(0.01, config)
+    active_target, active_intent = map_continuous_action(0.04, config)
+    short_target, short_intent = map_continuous_action(-0.04, config)
+
+    assert ignored_target == pytest.approx(0.0)
+    assert ignored_intent == "WAIT_FLAT"
+    assert active_target == pytest.approx(0.02)
+    assert active_intent == "TARGET_LONG"
+    assert short_target == pytest.approx(-0.02)
+    assert short_intent == "TARGET_SHORT"
 
 
 def test_trade_plan_context_and_take_profit_are_simulated() -> None:

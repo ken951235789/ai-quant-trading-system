@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -92,6 +93,8 @@ def _configs() -> tuple[TemporalTransformerConfig, TransformerTrainingConfig]:
             validation_fraction=0.15,
             seed=7,
             checkpoint_metric="hierarchical_skill_score",
+            drop_constant_features=False,
+            max_feature_correlation=None,
         ),
     )
 
@@ -119,12 +122,8 @@ def test_dataset_excludes_future_targets_and_uses_time_splits(tmp_path: Path) ->
     assert sample["tradeability"].shape == (2,)
     assert sample["movement_directions"].shape == (2,)
     assert sample["future_sides"].shape == (2,)
-    assert prepared.scaler.label_mode == (
-        "hierarchical_movement_side_cost_aware_tradeability"
-    )
-    assert len(prepared.scaler.feature_group_ids) == len(
-        prepared.scaler.feature_columns
-    )
+    assert prepared.scaler.label_mode == ("hierarchical_movement_side_cost_aware_tradeability")
+    assert len(prepared.scaler.feature_group_ids) == len(prepared.scaler.feature_columns)
 
 
 def test_dataset_prioritizes_all_multitimeframe_scales(tmp_path: Path) -> None:
@@ -158,6 +157,32 @@ def test_dataset_prioritizes_all_multitimeframe_scales(tmp_path: Path) -> None:
         assert any(column.startswith(f"mtf_{interval}_") for column in selected)
 
 
+def test_feature_pruning_uses_training_slice_for_constants_and_duplicates(
+    tmp_path: Path,
+) -> None:
+    source = _write_feature_csv(tmp_path / "pruning.csv", rows=260)
+    frame = pd.read_csv(source)
+    signal = np.sin(np.arange(len(frame)) / 9)
+    frame["ema_20_50_atr"] = signal
+    frame["macd_histogram_atr"] = signal * 2
+    frame["adx_14"] = 1.0
+    frame.to_csv(source, index=False)
+    model_config, training_config = _configs()
+    model_config = replace(model_config, input_features=64)
+    training_config = replace(
+        training_config,
+        drop_constant_features=True,
+        max_feature_correlation=0.99,
+    )
+
+    prepared = prepare_transformer_datasets([source], model_config, training_config)
+
+    selected = prepared.scaler.feature_columns
+    assert "ema_20_50_atr" in selected
+    assert "macd_histogram_atr" not in selected
+    assert "adx_14" not in selected
+
+
 def test_nine_timeframe_dataset_keeps_every_financial_indicator(tmp_path: Path) -> None:
     source = _write_feature_csv(tmp_path / "btc_nine_timeframes.csv", rows=260)
     frame = pd.read_csv(source)
@@ -177,9 +202,7 @@ def test_nine_timeframe_dataset_keeps_every_financial_indicator(tmp_path: Path) 
     )
     frame.to_csv(source, index=False)
     _, training_config = _configs()
-    mtf_feature_count = len(BTC_MULTITIMEFRAME_INTERVALS) * (
-        len(MULTITIMEFRAME_FEATURE_NAMES) + 2
-    )
+    mtf_feature_count = len(BTC_MULTITIMEFRAME_INTERVALS) * (len(MULTITIMEFRAME_FEATURE_NAMES) + 2)
     model_config = TemporalTransformerConfig(
         input_features=(mtf_feature_count * 4 + 2) // 3 + 16,
         sequence_length=8,
@@ -225,12 +248,14 @@ def test_two_epoch_training_saves_complete_artifacts(tmp_path: Path) -> None:
     assert 0 <= result.metrics["cost_aware_direction_balanced_accuracy"] <= 1
     assert "direction_majority_baseline" in result.metrics
     assert "direction_skill_score" in result.metrics
+    assert "deployment_horizon_skill_score" in result.metrics
     assert updates[-1]["status"] == "complete"
     history = pd.read_csv(result.history_csv)
     assert len(history) == 2
     assert "validation_direction_balanced_accuracy" in history
     assert "validation_direction_accuracy_lift" in history
     assert "validation_direction_skill_score" in history
+    assert "validation_deployment_horizon_skill_score" in history
     summary = json.loads(result.summary_json.read_text(encoding="utf-8"))
     assert summary["checkpoint_metric"] == "hierarchical_skill_score"
     assert len(summary["training_class_balance"]["direction_class_weights"]) == 2
@@ -242,9 +267,7 @@ def test_two_epoch_training_saves_complete_artifacts(tmp_path: Path) -> None:
         weights_only=True,
     )
     assert checkpoint["schema_version"] == 3
-    assert checkpoint["calibration"]["method"] == (
-        "temperature_scaling_validation_grid_v1"
-    )
+    assert checkpoint["calibration"]["method"] == ("temperature_scaling_validation_grid_v1")
     predictions = pd.read_csv(result.run_dir / "test_predictions.csv")
     assert "predicted_long_edge_1" in predictions
     assert "tradeability_probability_2" in predictions

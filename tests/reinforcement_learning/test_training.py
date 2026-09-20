@@ -48,7 +48,7 @@ def test_builds_sac_action_noise_and_parameters() -> None:
 
     parameters, noise = build_algorithm_parameters(config, 1)
 
-    assert parameters["buffer_size"] == 200_000
+    assert parameters["buffer_size"] == 400_000
     assert parameters["train_freq"] == (1, "step")
     assert noise is parameters["action_noise"]
 
