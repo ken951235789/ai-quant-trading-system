@@ -20,7 +20,7 @@ DEFAULT_OUTPUT = PROJECT_ROOT / "outputs" / "kaggle_sac_v31_corrected_three_seed
 DEFAULT_RUNNER = Path(__file__).with_name(
     "kaggle_sac_v31_corrected_three_seed_runner.py"
 )
-FORMAL_DATASET_ID = "ezkenn/ai-quant-btc-transformer-sac-v31-input"
+FORMAL_DATASET_SLUG = "ai-quant-btc-transformer-sac-v31-input"
 
 
 def _find_selected_run(root: Path) -> Path:
@@ -35,6 +35,8 @@ def build_kaggle_files(
     username: str,
     selected_run: Path,
     runner: Path,
+    *,
+    formal_dataset_id: str | None = None,
 ) -> tuple[str, str]:
     """建立小型 checkpoint Dataset 與 SAC Kernel 中繼資料。"""
     dataset_dir = output_dir / "transformer_dataset"
@@ -77,7 +79,9 @@ def build_kaggle_files(
                 "enable_gpu": True,
                 "enable_internet": False,
                 "machine_shape": "NvidiaTeslaT4",
-                "dataset_sources": [FORMAL_DATASET_ID, dataset_id],
+                "dataset_sources": [
+                    formal_dataset_id or f"{username}/{FORMAL_DATASET_SLUG}", dataset_id,
+                ],
                 "competition_sources": [],
                 "kernel_sources": [],
                 "model_sources": [],
@@ -92,7 +96,8 @@ def build_kaggle_files(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="建立修正版 SAC 三 seed Kaggle 任務")
-    parser.add_argument("--username", default="ezkenn")
+    parser.add_argument("--username", required=True, help="自己的 Kaggle 帳號")
+    parser.add_argument("--formal-dataset", help="行情 Dataset 的 owner/slug；預設使用自己的帳號")
     parser.add_argument("--result-root", type=Path, default=DEFAULT_RESULT_ROOT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--runner", type=Path, default=DEFAULT_RUNNER)
@@ -104,6 +109,7 @@ def main() -> int:
         args.username,
         selected,
         args.runner.resolve(),
+        formal_dataset_id=args.formal_dataset,
     )
     print(f"已選 Transformer：{selected}")
     print(f"Kaggle Dataset：{dataset_id}")

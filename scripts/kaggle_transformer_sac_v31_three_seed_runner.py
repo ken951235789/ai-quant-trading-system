@@ -199,7 +199,7 @@ def main() -> int:
             feedforward_dim=384,
             dropout=0.15,
             latent_dim=24,
-            return_horizons=(1, 5, 20),
+            return_horizons=(5, 20, 48),
             regime_classes=3,
             architecture_version=3,
             local_kernel_size=3,
@@ -236,7 +236,7 @@ def main() -> int:
                 quantile_loss_weight=0.15,
                 direction_threshold_bps=12.0,
                 movement_threshold_bps=2.0,
-                movement_atr_multiplier=0.10,
+                movement_atr_multiplier=0.50,
                 label_smoothing=0.01,
                 fee_bps_per_side=4.0,
                 slippage_bps_per_side=2.0,
@@ -250,8 +250,11 @@ def main() -> int:
                 direction_focal_gamma=1.0,
                 side_class_balance_power=0.25,
                 tradeability_class_balance_power=0.50,
-                checkpoint_metric="hierarchical_skill_score",
+                checkpoint_metric="deployment_horizon_skill_score",
+                checkpoint_horizon_weights=(0.15, 0.70, 0.15),
                 checkpoint_loss_penalty=0.02,
+                embargo_bars=48,
+                recency_half_life_days=365.0,
             )
             last_percent = -1
 
@@ -351,13 +354,13 @@ def main() -> int:
         ].reset_index(drop=True)
         if len(oos) < 10_000:
             raise RuntimeError(f"Transformer 樣本外資料僅 {len(oos):,} 列，不足以訓練 SAC")
-        # 風控閘門需要可交易方向的預期毛報酬，使用 Transformer 的 5 根預測值。
+        # 20 根是主要交易週期；5 根只提供進場 timing，48 根提供 regime。
         from ai_quant_trading.reinforcement_learning.feature_contract import (
             attach_expected_return, build_expected_return_contract,
         )
-        oos = attach_expected_return(oos, build_expected_return_contract(5))
+        oos = attach_expected_return(oos, build_expected_return_contract(20))
         if oos["expected_return"].notna().mean() < 0.99:
-            raise RuntimeError("Transformer 5 根預期報酬覆蓋率不足，禁止建立 SAC 環境")
+            raise RuntimeError("Transformer 20 根預期報酬覆蓋率不足，禁止建立 SAC 環境")
 
         missing_features = [column for column in feature_columns if column not in oos]
         if missing_features:
@@ -379,11 +382,11 @@ def main() -> int:
             max_drawdown_limit=0.10,
             episode_length=2_016,
             random_start=True,
-            holding_period_reference=5,
+            holding_period_reference=20,
             include_position_context=True,
             expert_kind="short_term",
             # deadband 使用實際持倉比例；2% 可抑制小調倉，又不會封死 10% 以上訊號。
-            rebalance_deadband=0.02,
+            rebalance_deadband=0.01,
             minimum_holding_bars=4,
             soft_drawdown_limit=0.06,
             soft_drawdown_multiplier=0.50,
@@ -395,8 +398,8 @@ def main() -> int:
             normalized_action_space=True,
             include_risk_context=True,
             include_trade_plan_context=True,
-            neutral_action_threshold=0.10,
-            action_semantics="hold_close_target",
+            neutral_action_threshold=0.0,
+            action_semantics="continuous_target",
             hold_action_threshold=0.03,
             close_action_threshold=0.10,
             leverage=2.0,
@@ -448,13 +451,13 @@ def main() -> int:
             deterministic_eval=True,
             save_replay_buffer=False,
             sac_buffer_size=400_000,
-            sac_learning_starts=10_000,
+            sac_learning_starts=20_000,
             sac_tau=0.005,
             sac_train_freq=1,
             sac_gradient_steps=1,
-            sac_ent_coef="auto",
+            sac_ent_coef="auto_0.01",
             sac_action_noise="normal",
-            sac_action_noise_sigma=0.03,
+            sac_action_noise_sigma=0.05,
         )
         last_sac_percent = -1
 

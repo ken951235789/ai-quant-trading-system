@@ -1560,7 +1560,7 @@ def _render_rl_page() -> None:
                         )
                     ].reset_index(drop=True)
                     training_frame = attach_expected_return(
-                        training_frame, build_expected_return_contract(5),
+                        training_frame, build_expected_return_contract(20),
                     )
                 training_frame = add_universal_rl_features(training_frame, feature_columns=selected_features)
                 training_frame.attrs["rl_feature_contract"] = compact_feature_metadata(selected_features)

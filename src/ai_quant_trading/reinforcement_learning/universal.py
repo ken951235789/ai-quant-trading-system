@@ -799,7 +799,8 @@ def add_universal_rl_features(
         transformer_horizons
     )
     role_horizons = (execution_horizon, setup_horizon, trend_horizon)
-    role_weights = (0.15, 0.35, 0.50) if role_horizons == (1, 5, 20) else (0.50, 0.35, 0.15)
+    # execution 只負責 timing、setup 負責主要方向、trend 負責風險背景。
+    role_weights = (0.15, 0.70, 0.15)
     multimodal["u_transformer_execution_signal"] = role_signals[execution_horizon]
     multimodal["u_transformer_setup_signal"] = role_signals[setup_horizon]
     multimodal["u_transformer_trend_signal"] = role_signals[trend_horizon]

@@ -127,7 +127,12 @@ def test_multimodal_features_preserve_valid_context() -> None:
     np.testing.assert_allclose(result["u_transformer_trend_signal"], 0.576)
     np.testing.assert_allclose(result["u_transformer_setup_signal"], 0.384)
     np.testing.assert_allclose(result["u_transformer_execution_signal"], 0.08)
-    np.testing.assert_allclose(result["u_transformer_consensus_signal"], 0.4344)
+    # 舊 1／5／20 checkpoint 也沿用 timing／primary／regime 的 15／70／15 權重。
+    expected_consensus = 0.15 * 0.08 + 0.70 * 0.384 + 0.15 * 0.576
+    np.testing.assert_allclose(
+        result["u_transformer_consensus_signal"],
+        expected_consensus,
+    )
 
 
 def test_multitimeframe_features_are_added_to_ppo_observation() -> None:

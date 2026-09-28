@@ -116,6 +116,7 @@ def _write_reduced_csv(
     previous_timestamp: pd.Timestamp | None = None
     invalid_timestamps = 0
     duplicate_or_reversed = 0
+    monthly_derivatives: dict[str, list[int]] = {}
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         destination.unlink()
@@ -138,6 +139,21 @@ def _write_reduced_csv(
                 duplicate_or_reversed += 1
             duplicate_or_reversed += int((valid.diff().dropna() <= pd.Timedelta(0)).sum())
             previous_timestamp = valid.iloc[-1]
+        if "derivatives_available" not in chunk:
+            raise ValueError("正式資料缺少 derivatives_available，無法驗證衍生品覆蓋率")
+        availability = pd.to_numeric(
+            chunk["derivatives_available"], errors="coerce"
+        ).fillna(0.0).clip(0.0, 1.0)
+        coverage_frame = pd.DataFrame(
+            {
+                "month": timestamps.dt.strftime("%Y-%m"),
+                "available": availability,
+            }
+        ).dropna(subset=["month"])
+        for month, values in coverage_frame.groupby("month", sort=False)["available"]:
+            counters = monthly_derivatives.setdefault(str(month), [0, 0])
+            counters[0] += int(len(values))
+            counters[1] += int((values >= 0.5).sum())
         chunk.to_csv(
             destination,
             mode="w" if chunk_index == 0 else "a",
@@ -154,6 +170,28 @@ def _write_reduced_csv(
         raise ValueError(f"時間軸包含 {duplicate_or_reversed} 筆重複或逆序資料")
     if first_timestamp is None or previous_timestamp is None:
         raise ValueError("正式資料沒有有效時間")
+    coverage_by_month = {
+        month: {
+            "rows": counters[0],
+            "available_rows": counters[1],
+            "coverage": counters[1] / max(counters[0], 1),
+        }
+        for month, counters in sorted(monthly_derivatives.items())
+    }
+    minimum_derivatives_coverage = min(
+        (float(item["coverage"]) for item in coverage_by_month.values()),
+        default=0.0,
+    )
+    if minimum_derivatives_coverage < 0.95:
+        failed = {
+            month: round(float(item["coverage"]), 6)
+            for month, item in coverage_by_month.items()
+            if float(item["coverage"]) < 0.95
+        }
+        raise ValueError(
+            "衍生品資料月覆蓋率低於 95%，禁止建立正式訓練包："
+            f"{failed}"
+        )
     return {
         "rows": rows,
         "columns": len(selected),
@@ -165,6 +203,9 @@ def _write_reduced_csv(
         "end_at": previous_timestamp.isoformat(),
         "sha256": _sha256(destination),
         "size_bytes": destination.stat().st_size,
+        "derivatives_coverage_by_month": coverage_by_month,
+        "minimum_derivatives_coverage": minimum_derivatives_coverage,
+        "derivatives_coverage_gate": 0.95,
     }
 
 
@@ -242,7 +283,14 @@ def build_bundle(source: Path, output_dir: Path) -> Path:
             shutil.rmtree(staging)
 
 
-def build_kaggle_files(output_dir: Path, username: str, runner: Path) -> None:
+def build_kaggle_files(
+    output_dir: Path,
+    username: str,
+    runner: Path,
+    *,
+    dataset_slug: str = "ai-quant-btc-transformer-v3-formal-input",
+    kernel_slug: str = "ai-quant-btc-transformer-v3-formal-training",
+) -> None:
     dataset_dir = output_dir / "dataset"
     kernel_dir = output_dir / "kernel"
     dataset_dir.mkdir(parents=True, exist_ok=True)
@@ -251,11 +299,11 @@ def build_kaggle_files(output_dir: Path, username: str, runner: Path) -> None:
     shutil.copy2(archive, dataset_dir / archive.name)
     shutil.copy2(runner, kernel_dir / "train_transformer_v3.py")
 
-    dataset_id = f"{username}/ai-quant-btc-transformer-v3-formal-input"
+    dataset_id = f"{username}/{dataset_slug}"
     (dataset_dir / "dataset-metadata.json").write_text(
         json.dumps(
             {
-                "title": "AI Quant BTC Transformer V3 Formal Input",
+                "title": dataset_slug.replace("-", " ").title(),
                 "id": dataset_id,
                 "licenses": [{"name": "CC0-1.0"}],
             },
@@ -267,8 +315,8 @@ def build_kaggle_files(output_dir: Path, username: str, runner: Path) -> None:
     (kernel_dir / "kernel-metadata.json").write_text(
         json.dumps(
             {
-                "id": f"{username}/ai-quant-btc-transformer-v3-formal-training",
-                "title": "AI Quant BTC Transformer V3 Formal Training",
+                "id": f"{username}/{kernel_slug}",
+                "title": kernel_slug.replace("-", " ").title(),
                 "code_file": "train_transformer_v3.py",
                 "language": "python",
                 "kernel_type": "script",
@@ -286,6 +334,16 @@ def build_kaggle_files(output_dir: Path, username: str, runner: Path) -> None:
         ),
         encoding="utf-8",
     )
+    # 第二個任務共用私人資料快照，由監控確認第一階段結束後再提交。
+    if runner.name == "kaggle_transformer_v3_five_seed_runner.py":
+        sac_dir = output_dir / "kernel_sac"
+        sac_dir.mkdir(exist_ok=True)
+        shutil.copy2(Path(__file__).with_name("kaggle_sac_v34_ablation_runner.py"), sac_dir / "train_sac_v34.py")
+        metadata = json.loads((kernel_dir / "kernel-metadata.json").read_text(encoding="utf-8"))
+        sac_slug = f"{kernel_slug.removesuffix('-training')}-sac-study"
+        metadata.update({"id": f"{username}/{sac_slug}",
+                         "title": sac_slug.replace("-", " ").title(), "code_file": "train_sac_v34.py"})
+        (sac_dir / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
 
 def main() -> int:
@@ -303,6 +361,16 @@ def main() -> int:
         default=Path(__file__).with_name("kaggle_transformer_v3_five_seed_runner.py"),
         help="要提交至 Kaggle 的正式訓練程式",
     )
+    parser.add_argument(
+        "--dataset-slug",
+        default="ai-quant-btc-transformer-v3-formal-input",
+        help="私人 Kaggle Dataset slug；新實驗建議使用唯一名稱避免快取舊資料",
+    )
+    parser.add_argument(
+        "--kernel-slug",
+        default="ai-quant-btc-transformer-v3-formal-training",
+        help="私人 Kaggle Kernel slug",
+    )
     args = parser.parse_args()
     output = args.output.resolve()
     archive = build_bundle(args.source.resolve(), output)
@@ -310,6 +378,8 @@ def main() -> int:
         output,
         args.username,
         args.runner.resolve(),
+        dataset_slug=args.dataset_slug,
+        kernel_slug=args.kernel_slug,
     )
     print(f"正式訓練包：{archive}")
     print(f"壓縮後大小：{archive.stat().st_size / (1024**2):.1f} MB")

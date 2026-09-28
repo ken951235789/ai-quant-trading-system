@@ -210,3 +210,15 @@ python scripts\build_windows_exe.py
 ```
 
 輸出位於 `dist/AIQuantTradingSystem/`，使用時必須保留完整資料夾。
+
+## 成本後與策略事件研究
+
+- `run_transformer_strategy_event.py`：固定規則、候選診斷與 V3 事件訓練。
+- `build_kaggle_strategy_event.py`：白名單建立私人 Kaggle 研究包；不自動提交。
+- `kaggle_strategy_event_runner.py`：校驗快照，支援 ZIP／已解壓輸入，保存進度與结果。
+- `monitor_kaggle_v34.py`：可能提交後續 SAC 工作並消耗配額，不是純唯讀狀態命令。
+- `check_public_repository.py --staged`：檢查即將發布的 Git 暫存區，不输出疑似秘密原文。
+
+使用方式見 [事件研究指南](../docs/transformer_strategy_event_20260924.md)。
+Kaggle builder 的 `--username` 必須由使用者提供；SAC builder 可用 `--formal-dataset`
+指定自己有權使用的行情 Dataset，不能依賴他人的私人帳號或資料集。

@@ -66,7 +66,7 @@ class BTCEnvironmentSettings:
     max_consecutive_losses: int = 3
     take_profit_distance: float = 0.015
     episode_length: int = 2_880
-    expected_return_horizon: int = 5
+    expected_return_horizon: int = 20
     feature_budget: int = 112
 
     def __post_init__(self) -> None:

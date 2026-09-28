@@ -57,7 +57,7 @@ COMPACT_TRANSFORMER_FEATURES = (
 )
 
 
-def build_expected_return_contract(horizon: int = 5) -> dict[str, object]:
+def build_expected_return_contract(horizon: int = 20) -> dict[str, object]:
     if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon <= 0:
         raise ValueError("expected_return 的 horizon 必須是正整數 K 線根數")
     return {

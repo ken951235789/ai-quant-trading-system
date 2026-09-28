@@ -86,12 +86,23 @@ Walk-forward 回測 -> 模擬倉 -> Testnet -> Live 品質閘門
 
 ## 目前研究結果
 
-目前 Transformer 在較長的 20 根預測上曾超越多數類別基準，但 5 根短線預測優勢仍不穩定。正式 SAC 候選在四次樣本外測試均為負，因此沒有升級為 Champion，也沒有開啟 final holdout。
+截至 2026-09-24，最新固定策略事件研究已在 Kaggle 完成：固定突破基準在研究 Test
+成交 329 筆，扣設定成本後每筆平均名目本金淨收益 -0.2561%；Transformer 過濾後 0 筆。
+流程可執行，但沒有證明交易優勢，不能升級 Champion 或接實盤。
+
+前一輪 V3.4 五 seed 的成本後固定持倉診斷也未通過研究閘門；SAC 後續工作在雲端
+啟動失敗，已修正載入流程但尚未重送，不能宣稱有該輪 SAC 成果。早期 V3.1 的
+四次 SAC 樣本外測試亦皆為負。各輪模型、資料與指標不同，不能直接混成同一績效。
 
 這個結果保留在研究紀錄中，因為研究重點是建立可信的驗證流程，而不是只展示最好的一次回測。數字與限制請見 [研究結果](docs/RESEARCH_RESULTS.md)。
 
 本輪 Transformer-only、SAC 消融與 cross-fit OOS 的設計及操作方式，請見
 [Transformer 與 SAC 三項優化說明](docs/Transformer與SAC三項優化說明.md)。
+
+最新的 [固定策略事件研究](docs/transformer_strategy_event_20260924.md) 使用既有 V3 訓練器，
+將固定策略的成本後交易結果作為標籤，並隔離 Calibration／Selection。
+這是 CLI 研究模式，checkpoint 不相容於舊 SAC 推論；不是直接替換正式機器人的模型。
+已反覆研究的 Test 不再視為全新 final holdout，後續驗收需要未見過的期間。
 
 ## 專案結構
 
@@ -106,7 +117,7 @@ docs/                       架構、研究與操作文件
 data/*/README.md            資料目錄契約，不包含真實資料
 ```
 
-公開版本不包含市場資料、模型權重、資料庫、交易紀錄、日誌、憑證或可執行檔。範圍與掃描方式請見 [公開版本安全說明](docs/PUBLIC_RELEASE_SCOPE.md)與[安全稽核報告](docs/SECURITY_AUDIT_20260920.md)。
+公開版本不包含市場資料、模型權重、資料庫、交易紀錄、日誌、憑證或可執行檔。範圍與掃描方式請見 [公開版本安全說明](docs/PUBLIC_RELEASE_SCOPE.md)與[安全稽核報告](docs/SECURITY_AUDIT_20260928.md)。
 
 ## 開發環境
 

@@ -18,8 +18,11 @@ class TemporalTransformerConfig:
     dropout: float = 0.10
     latent_dim: int = 16
     # 15 分鐘決策線分別對應 75 分鐘、5 小時與 12 小時。
-    # 最短週期負責執行，中期確認 setup，長期只提供趨勢背景。
+    # 最短週期負責進場時機，中期負責交易方向，長期只提供市場狀態。
     return_horizons: tuple[int, ...] = (5, 20, 48)
+    timing_horizon: int | None = None
+    primary_horizon: int | None = None
+    regime_horizon: int | None = None
     regime_classes: int = 3
     architecture_version: int = 3
     local_kernel_size: int = 3
@@ -52,6 +55,28 @@ class TemporalTransformerConfig:
             self,
             "feature_group_names",
             tuple(str(value) for value in self.feature_group_names),
+        )
+        horizons = self.return_horizons
+        if not horizons or any(value <= 0 for value in horizons):
+            raise ValueError("return_horizons 必須包含正整數")
+        object.__setattr__(
+            self,
+            "timing_horizon",
+            int(self.timing_horizon if self.timing_horizon is not None else horizons[0]),
+        )
+        object.__setattr__(
+            self,
+            "primary_horizon",
+            int(
+                self.primary_horizon
+                if self.primary_horizon is not None
+                else horizons[min(1, len(horizons) - 1)]
+            ),
+        )
+        object.__setattr__(
+            self,
+            "regime_horizon",
+            int(self.regime_horizon if self.regime_horizon is not None else horizons[-1]),
         )
         for name in [
             "input_features",
@@ -92,8 +117,9 @@ class TemporalTransformerConfig:
             raise ValueError("feature_group_ids 只能包含 0、1、2")
         if not 0 <= self.dropout < 1:
             raise ValueError("dropout 必須介於 0（含）與 1（不含）之間")
-        if not self.return_horizons or any(value <= 0 for value in self.return_horizons):
-            raise ValueError("return_horizons 必須包含正整數")
+        for name in ("timing_horizon", "primary_horizon", "regime_horizon"):
+            if getattr(self, name) not in self.return_horizons:
+                raise ValueError(f"{name} 必須存在於 return_horizons")
         if len(self.quantile_levels) < 3:
             raise ValueError("quantile_levels 至少需要三個分位數")
         if tuple(sorted(self.quantile_levels)) != self.quantile_levels:
@@ -154,15 +180,68 @@ class TransformerTrainingConfig:
     max_feature_correlation: float | None = 0.985
     correlation_sample_rows: int = 50_000
     movement_threshold_bps: float = 2.0
-    movement_atr_multiplier: float = 0.10
+    movement_atr_multiplier: float = 0.50
     side_loss_weight: float = 0.75
     side_class_balance_power: float = 0.25
+    embargo_bars: int = 0
+    recency_half_life_days: float | None = None
+    recency_min_weight: float = 0.10
+    drift_warning_threshold: float = 0.10
+    availability_drift_warning_threshold: float = 0.05
+    minimum_hold_fraction: float = 0.10
+    maximum_hold_fraction: float = 0.60
+    selective_coverages: tuple[float, ...] = (0.05, 0.10, 0.20)
+    # 舊成品保留原本語意；新研究明確選擇與固定持有回放一致的淨收益標籤。
+    trading_target_mode: str = "first_touch"
+    training_horizon_weights: tuple[float, ...] = ()
+    calibration_fraction: float = 0.0
+    economic_minimum_trades: int = 30
+    economic_minimum_edge_bps: float = 2.0
+    economic_downside_penalty: float = 0.10
+    strategy_event_config: dict[str, object] | None = None
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "training_horizon_weights", tuple(
+            float(value) for value in self.training_horizon_weights
+        ))
+        if self.trading_target_mode not in {"first_touch", "terminal_net", "strategy_event"}:
+            raise ValueError("trading_target_mode 不支援")
+        if self.trading_target_mode == "strategy_event":
+            from ai_quant_trading.transformer.strategy_events import StrategyEventConfig
+
+            if self.strategy_event_config is None:
+                raise ValueError("策略事件模式必須明列規則與成本準備金假設")
+            StrategyEventConfig(**self.strategy_event_config)
+            inactive = (self.volatility_loss_weight, self.regime_loss_weight,
+                        self.direction_loss_weight, self.side_loss_weight,
+                        self.edge_loss_weight, self.excursion_loss_weight,
+                        self.volatility_regime_loss_weight)
+            if any(inactive) or self.tradeability_loss_weight <= 0:
+                raise ValueError("事件模式僅訓練淨收益、分位數及交易成功機率")
+            if self.checkpoint_metric != "validation_loss" or self.calibration_fraction <= 0:
+                raise ValueError("事件模式需要獨立校準區段，並以 validation_loss 選模")
+        elif self.strategy_event_config is not None:
+            raise ValueError("strategy_event_config 僅供 strategy_event 模式使用")
+        if not 0 <= self.calibration_fraction < 1:
+            raise ValueError("calibration_fraction 必須介於 0（含）與 1（不含）")
+        if self.economic_minimum_trades < 2:
+            raise ValueError("economic_minimum_trades 至少為 2")
+        if self.economic_minimum_edge_bps < 0 or self.economic_downside_penalty < 0:
+            raise ValueError("經濟評估門檻不可為負數")
+        if self.training_horizon_weights and (
+            any(value < 0 for value in self.training_horizon_weights)
+            or sum(self.training_horizon_weights) <= 0
+        ):
+            raise ValueError("training_horizon_weights 必須非負且加總大於 0")
         object.__setattr__(
             self,
             "checkpoint_horizon_weights",
             tuple(float(value) for value in self.checkpoint_horizon_weights),
+        )
+        object.__setattr__(
+            self,
+            "selective_coverages",
+            tuple(float(value) for value in self.selective_coverages),
         )
         if self.epochs <= 0 or self.batch_size <= 0:
             raise ValueError("epochs 與 batch_size 必須大於 0")
@@ -227,6 +306,7 @@ class TransformerTrainingConfig:
             "hierarchical_skill_score",
             "cost_aware_direction_balanced_accuracy",
             "deployment_horizon_skill_score",
+            "economic_selection_score",
         }:
             raise ValueError("checkpoint_metric 不支援")
         if any(value < 0 for value in self.checkpoint_horizon_weights):
@@ -239,6 +319,22 @@ class TransformerTrainingConfig:
             raise ValueError("max_feature_correlation 必須介於 0 與 1，或設為 None")
         if self.correlation_sample_rows < 100:
             raise ValueError("correlation_sample_rows 至少需要 100")
+        if self.embargo_bars < 0:
+            raise ValueError("embargo_bars 不可小於 0")
+        if self.recency_half_life_days is not None and self.recency_half_life_days <= 0:
+            raise ValueError("recency_half_life_days 必須大於 0，或設為 None")
+        if not 0 < self.recency_min_weight <= 1:
+            raise ValueError("recency_min_weight 必須介於 0 與 1")
+        if not 0 < self.drift_warning_threshold < 1:
+            raise ValueError("drift_warning_threshold 必須介於 0 與 1")
+        if not 0 < self.availability_drift_warning_threshold <= 1:
+            raise ValueError("availability_drift_warning_threshold 必須介於 0 與 1")
+        if not 0 <= self.minimum_hold_fraction < self.maximum_hold_fraction <= 1:
+            raise ValueError("HOLD 比例上下限必須滿足 0 <= minimum < maximum <= 1")
+        if not self.selective_coverages or any(
+            not 0 < value <= 1 for value in self.selective_coverages
+        ):
+            raise ValueError("selective_coverages 必須包含介於 0 與 1 的比例")
         if not 0 <= self.label_smoothing < 1:
             raise ValueError("label_smoothing 必須介於 0（含）與 1（不含）之間")
         if self.max_rows_per_source is not None and self.max_rows_per_source < 100:
@@ -247,4 +343,6 @@ class TransformerTrainingConfig:
     def to_dict(self) -> dict[str, object]:
         result = asdict(self)
         result["checkpoint_horizon_weights"] = list(self.checkpoint_horizon_weights)
+        result["selective_coverages"] = list(self.selective_coverages)
+        result["training_horizon_weights"] = list(self.training_horizon_weights)
         return result

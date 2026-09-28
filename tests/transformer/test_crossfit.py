@@ -70,6 +70,27 @@ def test_rolling_crossfit_uses_bounded_training_window() -> None:
     assert plan.folds[-1].fit_start > 0
 
 
+def test_crossfit_embargo_is_a_single_gap_before_each_oos_block() -> None:
+    config = TransformerCrossFitConfig(
+        folds=3,
+        initial_train_fraction=0.40,
+        final_holdout_fraction=0.10,
+        minimum_fit_rows=30,
+        minimum_oos_rows=8,
+        minimum_final_holdout_rows=12,
+        embargo_bars=4,
+    )
+    plan = build_transformer_crossfit_plan(_frame(), config, max_horizon_bars=20)
+
+    assert all(fold.oos_start - fold.fit_end == 4 for fold in plan.folds)
+    assert all(
+        left.oos_end == right.fit_end
+        for left, right in zip(plan.folds, plan.folds[1:], strict=False)
+    )
+    assert all(fold.oos_end - fold.oos_start >= 8 for fold in plan.folds)
+    assert plan.folds[-1].oos_end == plan.final_holdout_start
+
+
 def test_crossfit_assembler_rejects_prediction_from_fit_period() -> None:
     fold = build_transformer_crossfit_plan(_frame(), _config(), max_horizon_bars=20).folds[0]
     leaked = _frame().iloc[fold.fit_end - 1 : fold.oos_end].copy()
@@ -127,7 +148,7 @@ def test_crossfit_runner_builds_only_oos_predictions(tmp_path: Path) -> None:
     )
     assert predictions["transformer_oos"].eq(1).all()
     assert "expected_return" in loaded
-    assert loaded.attrs["expected_return_contract"]["horizon_bars"] == 5
+    assert loaded.attrs["expected_return_contract"]["horizon_bars"] == 20
     assert metadata["predictions_sha256"]
     assert pd.to_datetime(predictions["timestamp"], utc=True).max() < pd.Timestamp(
         result.plan.final_holdout_start_at

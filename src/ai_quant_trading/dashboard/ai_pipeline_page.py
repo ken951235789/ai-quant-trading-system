@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
@@ -30,10 +31,6 @@ from ai_quant_trading.dashboard.services import (
 )
 from ai_quant_trading.dashboard.ui import themed_dataframe, themed_widget_key
 from ai_quant_trading.performance import available_cpu_threads
-from ai_quant_trading.transformer import (
-    TemporalTransformerConfig,
-    TransformerTrainingConfig,
-)
 from ai_quant_trading.startup_refresh import (
     load_startup_refresh_status,
     scored_news_path,
@@ -506,7 +503,9 @@ def render_ai_pipeline_page(
         width="stretch",
     ):
         try:
-            transformer_config = TemporalTransformerConfig(
+            parsed_horizons = _parse_horizons(str(horizons_text))
+            transformer_config = replace(
+                saved.transformer,
                 input_features=int(input_features),
                 sequence_length=int(sequence_length),
                 d_model=int(d_model),
@@ -515,20 +514,17 @@ def render_ai_pipeline_page(
                 feedforward_dim=int(feedforward),
                 dropout=float(dropout),
                 latent_dim=int(latent_dim),
-                return_horizons=_parse_horizons(str(horizons_text)),
-                regime_classes=int(regime_classes),
-                architecture_version=saved.transformer.architecture_version,
-                local_kernel_size=saved.transformer.local_kernel_size,
-                quantile_levels=saved.transformer.quantile_levels,
-                patch_size=saved.transformer.patch_size,
-                patch_stride=saved.transformer.patch_stride,
-                feature_group_ids=saved.transformer.feature_group_ids,
-                feature_group_names=saved.transformer.feature_group_names,
-                volatility_regime_classes=(
-                    saved.transformer.volatility_regime_classes
+                return_horizons=parsed_horizons,
+                timing_horizon=parsed_horizons[0],
+                primary_horizon=(
+                    parsed_horizons[1] if len(parsed_horizons) > 1 else parsed_horizons[0]
                 ),
+                regime_horizon=parsed_horizons[-1],
+                regime_classes=int(regime_classes),
             )
-            training_config = TransformerTrainingConfig(
+            # 只覆寫本頁可見欄位，避免儲存時清掉 embargo、近期權重及選模契約。
+            training_config = replace(
+                saved.transformer_training,
                 epochs=int(epochs),
                 batch_size=int(transformer_batch),
                 learning_rate=float(learning_rate),
@@ -543,42 +539,6 @@ def render_ai_pipeline_page(
                 train_fraction=float(train_fraction),
                 validation_fraction=float(validation_fraction),
                 seed=int(seed),
-                return_loss_weight=saved.transformer_training.return_loss_weight,
-                volatility_loss_weight=(
-                    saved.transformer_training.volatility_loss_weight
-                ),
-                regime_loss_weight=saved.transformer_training.regime_loss_weight,
-                direction_loss_weight=(
-                    saved.transformer_training.direction_loss_weight
-                ),
-                quantile_loss_weight=(
-                    saved.transformer_training.quantile_loss_weight
-                ),
-                direction_threshold_bps=(
-                    saved.transformer_training.direction_threshold_bps
-                ),
-                label_smoothing=saved.transformer_training.label_smoothing,
-                max_rows_per_source=saved.transformer_training.max_rows_per_source,
-                fee_bps_per_side=saved.transformer_training.fee_bps_per_side,
-                slippage_bps_per_side=(
-                    saved.transformer_training.slippage_bps_per_side
-                ),
-                max_observed_spread_bps=(
-                    saved.transformer_training.max_observed_spread_bps
-                ),
-                edge_loss_weight=saved.transformer_training.edge_loss_weight,
-                excursion_loss_weight=(
-                    saved.transformer_training.excursion_loss_weight
-                ),
-                tradeability_loss_weight=(
-                    saved.transformer_training.tradeability_loss_weight
-                ),
-                volatility_regime_loss_weight=(
-                    saved.transformer_training.volatility_regime_loss_weight
-                ),
-                probability_calibration=(
-                    saved.transformer_training.probability_calibration
-                ),
             )
             pipeline = AIPipelineConfig(
                 schema_version=max(saved.schema_version, 3),

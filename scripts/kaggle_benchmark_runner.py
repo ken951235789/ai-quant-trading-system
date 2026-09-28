@@ -73,7 +73,7 @@ def _run_transformer(root: Path, output: Path) -> dict[str, object]:
         feedforward_dim=192,
         dropout=0.10,
         latent_dim=16,
-        return_horizons=(1, 5, 20),
+        return_horizons=(5, 20, 48),
         architecture_version=3,
         patch_size=4,
         patch_stride=2,
@@ -156,7 +156,7 @@ def _run_sac(environment: Path, device: str, steps: int) -> dict[str, object]:
         sac_learning_starts=1_000,
         sac_train_freq=1,
         sac_gradient_steps=1,
-        sac_ent_coef="auto",
+        sac_ent_coef="auto_0.01",
         sac_action_noise="normal",
         sac_action_noise_sigma=0.05,
     )

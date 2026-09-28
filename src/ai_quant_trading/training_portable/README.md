@@ -1,6 +1,6 @@
 # 可攜式訓練模組
 
-BTC 環境建構預設使用 5 根預期報酬契約與最多 112 個精簡特徵，與主程式共用挑選器。
+BTC 環境建構預設使用 20 根主要預期報酬契約與最多 112 個精簡特徵，與主程式共用挑選器。
 `BTCEnvironmentSettings.expected_return_horizon` 與 `feature_budget` 會於建立時驗證。
 新特徵需重訓 Transformer 與 SAC，並重新產生可攜包；舊 ZIP 不會自動更新。
 

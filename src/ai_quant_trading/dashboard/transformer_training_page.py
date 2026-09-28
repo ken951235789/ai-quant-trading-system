@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 
@@ -29,8 +30,6 @@ from ai_quant_trading.dashboard.transformer_training_jobs import (
 from ai_quant_trading.features import BTC_MULTITIMEFRAME_INTERVALS
 from ai_quant_trading.performance import available_cpu_threads
 from ai_quant_trading.transformer import (
-    TemporalTransformerConfig,
-    TransformerTrainingConfig,
     apply_transformer_checkpoint,
     transformer_backend_status,
 )
@@ -319,6 +318,20 @@ def _render_results(transformer_root: Path, project_root: Path) -> None:
         f"{int(sample_counts.get('test', 0)):,}"
     )
     st.caption(f"模型：{_relative(selected / 'best_model.pt', project_root)}")
+    if summary.get("economic_evaluation"):
+        st.caption(str(summary.get("economic_evaluation_scope", "")))
+        economic = st.columns(3)
+        economic[0].metric("固定持有淨收益／筆", f"{float(metrics.get('fixed_hold_expectancy', 0)):.3%}")
+        economic[1].metric("不重疊交易數", int(metrics.get("fixed_hold_trades", 0)))
+        economic[2].metric("期望收益 95% 區間", f"{float(metrics.get('fixed_hold_expectancy_ci_low', 0)):.3%} ~ {float(metrics.get('fixed_hold_expectancy_ci_high', 0)):.3%}")
+        diagnostic_path = selected / "test_signal_diagnostics.csv"
+        if diagnostic_path.is_file():
+            diagnostics = pd.read_csv(diagnostic_path)
+            group = st.selectbox("訊號診斷分組", diagnostics["group"].unique(),
+                                 key="transformer_diagnostic_group")
+            themed_dataframe(diagnostics.loc[diagnostics["group"].eq(group)],
+                             hide_index=True, width="stretch",
+                             key=themed_widget_key("transformer_signal_diagnostics"))
     with st.expander("實際使用的特徵"):
         st.code("\n".join(summary.get("feature_columns", [])), language="text")
 
@@ -926,9 +939,10 @@ def _render_training_form(
             value=saved.transformer_training.probability_calibration,
             help="建議開啟；只使用驗證集估計溫度，不會接觸測試集。",
         )
-    with st.expander("Checkpoint 選模與特徵去重"):
+    with st.expander("Checkpoint 選模、時間切分與特徵去重"):
         selection = st.columns(4)
         checkpoint_options = [
+            "economic_selection_score",
             "deployment_horizon_skill_score",
             "hierarchical_skill_score",
             "direction_skill_score",
@@ -936,6 +950,23 @@ def _render_training_form(
             "validation_loss",
         ]
         saved_metric = saved.transformer_training.checkpoint_metric
+        research_controls = st.columns(3)
+        target_mode = research_controls[0].selectbox(
+            "主要交易標籤", ["terminal_net", "first_touch"],
+            index=0 if saved.transformer_training.trading_target_mode == "terminal_net" else 1,
+            format_func=lambda value: "到期成本後收益" if value == "terminal_net" else "首次碰觸障礙",
+        )
+        calibration_fraction = research_controls[1].number_input(
+            "驗證區內校準比例", min_value=0.0, max_value=0.8, step=0.1,
+            value=float(saved.transformer_training.calibration_fraction),
+        )
+        minimum_edge_bps = research_controls[2].number_input(
+            "最低預測淨收益（bps）", min_value=0.0, max_value=100.0, step=1.0,
+            value=float(saved.transformer_training.economic_minimum_edge_bps),
+        )
+        training_weights = st.text_input(
+            "Loss 週期權重", value=",".join(map(str, saved.transformer_training.training_horizon_weights)),
+        )
         checkpoint_metric = selection[0].selectbox(
             "最佳模型指標",
             checkpoint_options,
@@ -948,9 +979,9 @@ def _render_training_form(
             "週期權重",
             value=(
                 ",".join(map(str, saved.transformer_training.checkpoint_horizon_weights))
-                or "0.50,0.35,0.15"
+                or "0.15,0.70,0.15"
             ),
-            help="順序需與報酬預測週期一致；15m 短線建議 5/20/48 使用 0.50/0.35/0.15。",
+            help="順序需與報酬預測週期一致；5/20/48 分別為 timing、主要交易、regime。",
         )
         drop_constant_features = selection[2].toggle(
             "移除常數特徵",
@@ -976,6 +1007,43 @@ def _render_training_form(
             saved.transformer_training.correlation_sample_rows,
             1_000,
         )
+        split_policy = st.columns(4)
+        embargo_bars = split_policy[0].number_input(
+            "切分 Embargo（根）",
+            min_value=0,
+            max_value=10_000,
+            value=saved.transformer_training.embargo_bars,
+            step=1,
+            help="正式 5/20/48 訓練建議 48，避免相鄰切分共享同一段未來路徑。",
+        )
+        recency_enabled = split_policy[1].toggle(
+            "近期資料加權",
+            value=saved.transformer_training.recency_half_life_days is not None,
+        )
+        recency_half_life_days = split_policy[2].number_input(
+            "近期權重半衰期（天）",
+            min_value=1.0,
+            max_value=3_650.0,
+            value=float(saved.transformer_training.recency_half_life_days or 365.0),
+            step=30.0,
+            disabled=not recency_enabled,
+        )
+        recency_min_weight = split_policy[3].number_input(
+            "舊資料最低權重",
+            min_value=0.01,
+            max_value=1.0,
+            value=float(saved.transformer_training.recency_min_weight),
+            step=0.01,
+            disabled=not recency_enabled,
+        )
+        drift_warning_threshold = st.number_input(
+            "標籤漂移警告門檻（JS divergence）",
+            min_value=0.001,
+            max_value=0.700,
+            value=float(saved.transformer_training.drift_warning_threshold),
+            step=0.01,
+            format="%.3f",
+        )
 
     if st.button(
         "開始快速驗證" if quick_test else "開始 Transformer 訓練",
@@ -989,7 +1057,9 @@ def _render_training_form(
                 path.name.startswith("features_mtf_") for path in selected_files
             ):
                 raise ValueError("同一次訓練不可混用單週期與多週期資料")
-            model_config = TemporalTransformerConfig(
+            parsed_horizons = _parse_horizons(str(horizons))
+            model_config = replace(
+                saved.transformer,
                 input_features=int(maximum_features),
                 sequence_length=int(sequence_length),
                 d_model=int(d_model),
@@ -998,17 +1068,24 @@ def _render_training_form(
                 feedforward_dim=int(feedforward),
                 dropout=float(dropout),
                 latent_dim=int(latent_dim),
-                return_horizons=_parse_horizons(str(horizons)),
+                return_horizons=parsed_horizons,
+                timing_horizon=parsed_horizons[0],
+                primary_horizon=(
+                    parsed_horizons[1] if len(parsed_horizons) > 1 else parsed_horizons[0]
+                ),
+                regime_horizon=parsed_horizons[-1],
                 regime_classes=int(regime_classes),
                 architecture_version=int(architecture_version),
                 local_kernel_size=int(local_kernel_size),
                 quantile_levels=_parse_quantiles(str(quantile_levels)),
                 patch_size=int(patch_size),
                 patch_stride=int(patch_stride),
+                feature_group_ids=(),
                 hierarchical_direction=bool(hierarchical_direction),
                 horizon_adapter_dim=(int(horizon_adapter_dim) if hierarchical_direction else 0),
             )
-            training_config = TransformerTrainingConfig(
+            training_config = replace(
+                saved.transformer_training,
                 epochs=int(epochs),
                 batch_size=int(batch_size),
                 learning_rate=float(learning_rate),
@@ -1040,7 +1117,17 @@ def _render_training_form(
                 volatility_regime_loss_weight=float(volatility_regime_weight),
                 probability_calibration=bool(probability_calibration),
                 checkpoint_metric=str(checkpoint_metric),
+                trading_target_mode=str(target_mode),
+                calibration_fraction=float(calibration_fraction),
+                economic_minimum_edge_bps=float(minimum_edge_bps),
+                training_horizon_weights=(_parse_horizon_weights(training_weights) if training_weights.strip() else ()),
                 checkpoint_horizon_weights=_parse_horizon_weights(str(horizon_weights)),
+                embargo_bars=int(embargo_bars),
+                recency_half_life_days=(
+                    float(recency_half_life_days) if recency_enabled else None
+                ),
+                recency_min_weight=float(recency_min_weight),
+                drift_warning_threshold=float(drift_warning_threshold),
                 drop_constant_features=bool(drop_constant_features),
                 max_feature_correlation=(
                     float(max_feature_correlation) if correlation_filter else None

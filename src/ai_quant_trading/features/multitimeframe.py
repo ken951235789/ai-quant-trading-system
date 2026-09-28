@@ -30,7 +30,7 @@ from ai_quant_trading.market_clock import (
 )
 
 
-MULTITIMEFRAME_SCHEMA_VERSION = 5
+MULTITIMEFRAME_SCHEMA_VERSION = 7
 BTC_MULTITIMEFRAME_INTERVALS = _BTC_MULTITIMEFRAME_INTERVALS
 
 # 每個週期都輸出相同的比例化特徵，避免價格尺度不同時無法共同學習。
@@ -114,6 +114,9 @@ MULTITIMEFRAME_FEATURE_GROUPS = {
         "funding_zscore_200",
         "open_interest_zscore_50",
         "spread_fraction",
+        "funding_available",
+        "open_interest_available",
+        "spread_available",
         "derivatives_available",
     ),
     "市場狀態": (
@@ -133,6 +136,13 @@ MULTITIMEFRAME_METADATA_COLUMNS = frozenset(
         "mtf_source_intervals",
         "mtf_schema_version",
     }
+)
+DERIVATIVE_CONTEXT_COLUMNS = (
+    "funding_rate",
+    "open_interest",
+    "open_interest_value",
+    "open_interest_change",
+    "spread_bps",
 )
 
 
@@ -232,6 +242,79 @@ def _prepare_feature_frame(frame: pd.DataFrame, interval: str) -> pd.DataFrame:
             annualization_periods=infer_annualization_periods(result),
             drop_na=False,
         )
+    return result
+
+
+def _derivative_context_coverage(frame: pd.DataFrame) -> float:
+    if frame.empty:
+        return 0.0
+    # 同時評估「欄位種類」與「時間覆蓋率」。只含完整 spread 的高頻資料，
+    # 不應勝過同時具有 funding、OI 與 spread 的 15m 衍生品資料。
+    available = pd.DataFrame(
+        {
+            column: (
+                pd.to_numeric(frame[column], errors="coerce").notna()
+                if column in frame
+                else pd.Series(False, index=frame.index)
+            )
+            for column in DERIVATIVE_CONTEXT_COLUMNS
+        },
+        index=frame.index,
+    )
+    return float(available.to_numpy(dtype="float64").mean())
+
+
+def _propagate_derivative_context(
+    frames: Mapping[str, pd.DataFrame],
+) -> dict[str, pd.DataFrame]:
+    """以覆蓋率最佳的已收盤資料源補齊其他週期，不使用未來資訊。"""
+    result = {interval: frame.copy() for interval, frame in frames.items()}
+    source_interval = max(result, key=lambda value: _derivative_context_coverage(result[value]))
+    source = result[source_interval]
+    if _derivative_context_coverage(source) <= 0:
+        return result
+    source_columns = [column for column in DERIVATIVE_CONTEXT_COLUMNS if column in source]
+    context = pd.DataFrame(
+        {"_context_at": _bar_close_time(source, source_interval)},
+        index=source.index,
+    )
+    for column in source_columns:
+        context[f"_context_{column}"] = pd.to_numeric(source[column], errors="coerce")
+    context = (
+        context.dropna(subset=["_context_at"])
+        .sort_values("_context_at")
+        .drop_duplicates("_context_at", keep="last")
+    )
+    for interval, frame in result.items():
+        target = frame.sort_values("timestamp").reset_index(drop=True).copy()
+        query = pd.DataFrame(
+            {"_context_at": _bar_close_time(target, interval)},
+            index=target.index,
+        ).sort_values("_context_at")
+        aligned = pd.merge_asof(
+            query,
+            context,
+            on="_context_at",
+            direction="backward",
+            allow_exact_matches=True,
+        )
+        for column in source_columns:
+            propagated = pd.to_numeric(
+                aligned[f"_context_{column}"], errors="coerce"
+            )
+            current = (
+                pd.to_numeric(target[column], errors="coerce")
+                if column in target
+                else pd.Series(np.nan, index=target.index, dtype="float64")
+            )
+            target[column] = current.where(current.notna(), propagated)
+        if "open_interest" in target:
+            open_interest = pd.to_numeric(target["open_interest"], errors="coerce")
+            derived_change = open_interest.pct_change(fill_method=None)
+            if open_interest.notna().any():
+                # OI 水準先因果對齊，再按各自週期重算變化，不能重複使用 15m 變化率。
+                target["open_interest_change"] = derived_change
+        result[interval] = target
     return result
 
 
@@ -337,8 +420,20 @@ def _snapshot_features(frame: pd.DataFrame, interval: str) -> pd.DataFrame:
     taker_buy_ratio = (taker_buy_volume / volume.replace(0, np.nan)).clip(0.0, 1.0)
     funding_rate = numeric("funding_rate")
     funding_percentile = funding_rate.rolling(200, min_periods=20).rank(pct=True)
+    open_interest = numeric("open_interest")
     open_interest_change = numeric("open_interest_change")
+    if open_interest_change.isna().all() and open_interest.notna().any():
+        open_interest_change = open_interest.pct_change(fill_method=None)
+    funding_mean = funding_rate.rolling(200, min_periods=20).mean()
+    funding_std = funding_rate.rolling(200, min_periods=20).std(ddof=0)
+    funding_zscore = (funding_rate - funding_mean) / funding_std.replace(0, np.nan)
+    oi_mean = open_interest_change.rolling(50, min_periods=20).mean()
+    oi_std = open_interest_change.rolling(50, min_periods=20).std(ddof=0)
+    open_interest_zscore = (open_interest_change - oi_mean) / oi_std.replace(0, np.nan)
     spread_fraction = numeric("spread_bps") / 10_000
+    funding_available = funding_rate.notna().astype("float64")
+    open_interest_available = open_interest.notna().astype("float64")
+    spread_available = spread_fraction.notna().astype("float64")
     derivatives_available = pd.concat(
         [funding_rate, open_interest_change, spread_fraction], axis=1
     ).notna().any(axis=1).astype("float64")
@@ -452,13 +547,12 @@ def _snapshot_features(frame: pd.DataFrame, interval: str) -> pd.DataFrame:
             f"mtf_{token}_funding_rate": funding_rate.fillna(0.0),
             f"mtf_{token}_funding_percentile_200": funding_percentile.fillna(0.5),
             f"mtf_{token}_open_interest_change": open_interest_change.fillna(0.0),
-            f"mtf_{token}_funding_zscore_200": numeric(
-                "funding_zscore_200"
-            ).fillna(0.0),
-            f"mtf_{token}_open_interest_zscore_50": numeric(
-                "open_interest_zscore_50"
-            ).fillna(0.0),
+            f"mtf_{token}_funding_zscore_200": funding_zscore.fillna(0.0),
+            f"mtf_{token}_open_interest_zscore_50": open_interest_zscore.fillna(0.0),
             f"mtf_{token}_spread_fraction": spread_fraction.fillna(0.0),
+            f"mtf_{token}_funding_available": funding_available,
+            f"mtf_{token}_open_interest_available": open_interest_available,
+            f"mtf_{token}_spread_available": spread_available,
             f"mtf_{token}_derivatives_available": derivatives_available,
             f"mtf_{token}_trend_regime": trend_regime,
             f"mtf_{token}_high_volatility_regime": (
@@ -497,6 +591,7 @@ def build_multitimeframe_frame(
         interval: _prepare_feature_frame(frame, interval)
         for interval, frame in normalized.items()
     }
+    prepared = _propagate_derivative_context(prepared)
     identities = {
         (
             _first_text(frame, "exchange").lower(),

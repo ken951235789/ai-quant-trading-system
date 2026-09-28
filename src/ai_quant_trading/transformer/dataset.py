@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+import hashlib
 import re
 from typing import Sequence
 
@@ -276,9 +277,13 @@ class _PreparedSeries:
     future_excursions: np.ndarray
     tradeability: np.ndarray
     volatility_regime_source: np.ndarray
+    sample_weights: np.ndarray
     train_endpoints: np.ndarray
     validation_endpoints: np.ndarray
     test_endpoints: np.ndarray
+    timestamps_ns: np.ndarray
+    event_metadata: dict[str, np.ndarray] = field(default_factory=dict)
+    source_key: int = 0
 
 
 class MarketSequenceDataset(Dataset[dict[str, torch.Tensor]]):
@@ -335,10 +340,13 @@ class MarketSequenceDataset(Dataset[dict[str, torch.Tensor]]):
             dtype=np.float32,
         )
         references: list[tuple[int, int]] = []
+        sampling_weights: list[float] = []
         for series_index, item in enumerate(self.series):
             endpoints = getattr(item, endpoint_name)
             references.extend((series_index, int(endpoint)) for endpoint in endpoints)
+            sampling_weights.extend(float(item.sample_weights[endpoint]) for endpoint in endpoints)
         self.references = tuple(references)
+        self.sampling_weights = tuple(sampling_weights)
 
     def __len__(self) -> int:
         return len(self.references)
@@ -361,6 +369,10 @@ class MarketSequenceDataset(Dataset[dict[str, torch.Tensor]]):
             )
         )
         sample = {
+            "series_index": torch.tensor(series_index, dtype=torch.long),
+            "source_key": torch.tensor(item.source_key, dtype=torch.long),
+            "endpoint": torch.tensor(endpoint, dtype=torch.long),
+            "timestamp_ns": torch.tensor(item.timestamps_ns[endpoint], dtype=torch.long),
             "features": torch.from_numpy(features),
             "feature_mask": torch.from_numpy(feature_mask),
             "future_returns": torch.from_numpy(returns.astype(np.float32)),
@@ -397,6 +409,8 @@ class MarketSequenceDataset(Dataset[dict[str, torch.Tensor]]):
                     ),
                 }
             )
+        for name, values in item.event_metadata.items():
+            sample[f"event_{name}"] = torch.tensor(values[endpoint], dtype=torch.float64)
         return sample
 
 
@@ -410,6 +424,7 @@ class PreparedTransformerData:
     scaler: TransformerScaler
     sources: tuple[TransformerSourceSummary, ...]
     resolved_model_config: TemporalTransformerConfig
+    diagnostics: dict[str, object] = field(default_factory=dict)
 
     @property
     def sample_counts(self) -> dict[str, int]:
@@ -436,10 +451,16 @@ def _is_eligible_feature(column: str) -> bool:
 def _load_source(
     path: Path,
     max_rows: int | None,
+    *,
+    strategy_event: bool = False,
 ) -> tuple[pd.DataFrame, TransformerSourceSummary]:
     if not path.exists():
         raise FileNotFoundError(f"找不到特徵資料：{path}")
     frame = pd.read_csv(path)
+    if strategy_event:
+        from ai_quant_trading.transformer.strategy_events import validate_event_bars
+
+        validate_event_bars(frame)
     required = {"timestamp", "close"}
     missing = sorted(required.difference(frame.columns))
     if missing:
@@ -466,7 +487,7 @@ def _load_source(
         start_at=pd.Timestamp(frame.iloc[0]["timestamp"]).isoformat(),
         end_at=pd.Timestamp(frame.iloc[-1]["timestamp"]).isoformat(),
     )
-    return add_model_market_features(frame), summary
+    return (frame if strategy_event else add_model_market_features(frame)), summary
 
 
 def transformer_feature_group_ids(columns: Sequence[str]) -> tuple[int, ...]:
@@ -514,6 +535,34 @@ def _future_window_extreme(values: pd.Series, horizon: int, mode: str) -> pd.Ser
     rolling = shifted.rolling(horizon, min_periods=horizon)
     extreme = rolling.max() if mode == "max" else rolling.min()
     return extreme.shift(-(horizon - 1))
+
+
+def _first_touch_direction(
+    high: pd.Series,
+    low: pd.Series,
+    entry: pd.Series,
+    threshold: np.ndarray,
+    horizon: int,
+) -> np.ndarray:
+    """以未來路徑第一次碰觸上下障礙建立因果交易方向標籤。"""
+    entry_values = entry.to_numpy(dtype=np.float64)
+    barrier = np.asarray(threshold, dtype=np.float64)
+    result = np.ones(len(entry_values), dtype=np.int64)
+    unresolved = np.isfinite(entry_values) & (entry_values > 0) & np.isfinite(barrier)
+    for step in range(1, horizon + 1):
+        future_high = high.shift(-step).to_numpy(dtype=np.float64)
+        future_low = low.shift(-step).to_numpy(dtype=np.float64)
+        up_hit = unresolved & (future_high / entry_values - 1.0 >= barrier)
+        down_hit = unresolved & (future_low / entry_values - 1.0 <= -barrier)
+        only_up = up_hit & ~down_hit
+        only_down = down_hit & ~up_hit
+        ambiguous = up_hit & down_hit
+        result[only_up] = 2
+        result[only_down] = 0
+        # 同一根 K 同時碰觸上下障礙時無法知道先後，保守標記為不交易。
+        result[ambiguous] = 1
+        unresolved &= ~(up_hit | down_hit)
+    return result
 
 
 def _v3_targets(
@@ -574,16 +623,15 @@ def _v3_targets(
         funding_cost = funding_rate * (horizon * interval_minutes / 480.0)
         long_edge = log_return - round_trip_cost - funding_cost
         short_edge = -log_return - round_trip_cost + funding_cost
+        if training_config.trading_target_mode == "terminal_net":
+            # 線性合約以進場名目本金計算，與固定持有回放共用同一個收益定義。
+            long_edge = gross_return - round_trip_cost - funding_cost
+            short_edge = -gross_return - round_trip_cost + funding_cost
         edge_pair = np.column_stack(
             [
                 long_edge.to_numpy(dtype=np.float64),
                 short_edge.to_numpy(dtype=np.float64),
             ]
-        )
-        best_direction = np.where(
-            (long_edge > edge_buffer) & (long_edge >= short_edge),
-            2,
-            np.where(short_edge > edge_buffer, 0, 1),
         )
         movement_buffer = np.maximum(
             minimum_movement,
@@ -591,13 +639,44 @@ def _v3_targets(
             * training_config.movement_atr_multiplier
             * np.sqrt(horizon),
         )
-        log_return_values = log_return.to_numpy(dtype=np.float64)
-        movement_direction = np.where(
-            log_return_values > movement_buffer,
-            2,
-            np.where(log_return_values < -movement_buffer, 0, 1),
+        cost_buffer = (
+            round_trip_cost.to_numpy(dtype=np.float64)
+            + np.abs(funding_cost.to_numpy(dtype=np.float64))
+            + edge_buffer
         )
-        future_side = np.where(log_return_values >= 0.0, 1, 0)
+        trade_barrier = np.maximum(cost_buffer, movement_buffer)
+        best_direction = _first_touch_direction(
+            high,
+            low,
+            entry,
+            trade_barrier,
+            horizon,
+        )
+        if training_config.trading_target_mode == "terminal_net":
+            minimum_net_edge = np.maximum(
+                edge_buffer,
+                movement_buffer - round_trip_cost.to_numpy(dtype=np.float64),
+            )
+            long_values = long_edge.to_numpy(dtype=np.float64)
+            short_values = short_edge.to_numpy(dtype=np.float64)
+            best_direction = np.where(
+                (long_values > short_values) & (long_values > minimum_net_edge),
+                2,
+                np.where(short_values > minimum_net_edge, 0, 1),
+            )
+        log_return_values = log_return.to_numpy(dtype=np.float64)
+        movement_direction = _first_touch_direction(
+            high,
+            low,
+            entry,
+            movement_buffer,
+            horizon,
+        )
+        future_side = np.where(
+            best_direction == 2,
+            1,
+            np.where(best_direction == 0, 0, np.where(log_return_values >= 0.0, 1, 0)),
+        )
         future_high = _future_window_extreme(high, horizon, "max")
         future_low = _future_window_extreme(low, horizon, "min")
         downside = (1.0 - future_low / entry).clip(lower=0.0)
@@ -614,9 +693,7 @@ def _v3_targets(
                 ]
             )
         )
-        tradeability.append(
-            np.asarray(np.maximum(long_edge, short_edge) > edge_buffer, dtype=np.float64)
-        )
+        tradeability.append(np.asarray(best_direction != 1, dtype=np.float64))
         movement_directions.append(np.asarray(movement_direction, dtype=np.int64))
         future_sides.append(np.asarray(future_side, dtype=np.int64))
 
@@ -730,6 +807,7 @@ def _split_endpoints(
     max_horizon: int,
     train_fraction: float,
     validation_fraction: float,
+    embargo_bars: int = 0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
     train_cut = int(rows * train_fraction)
     validation_cut = int(rows * (train_fraction + validation_fraction))
@@ -744,10 +822,165 @@ def _split_endpoints(
 
     return (
         endpoints(0, train_cut),
-        endpoints(train_cut, validation_cut),
-        endpoints(validation_cut, rows),
+        endpoints(train_cut + embargo_bars, validation_cut),
+        endpoints(validation_cut + embargo_bars, rows),
         train_cut,
     )
+
+
+def _recency_sample_weights(
+    frame: pd.DataFrame,
+    train_endpoints: np.ndarray,
+    training_config: TransformerTrainingConfig,
+) -> np.ndarray:
+    """建立只影響訓練抽樣的時間衰減權重，驗證與測試仍維持原始分布。"""
+    weights = np.ones(len(frame), dtype=np.float32)
+    half_life = training_config.recency_half_life_days
+    if half_life is None or not len(train_endpoints):
+        return weights
+    timestamps = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
+    reference = timestamps.iloc[int(train_endpoints[-1])]
+    age_days = (reference - timestamps).dt.total_seconds().clip(lower=0.0) / 86_400
+    decayed = np.power(0.5, age_days.to_numpy(dtype=np.float64) / half_life)
+    decayed = np.clip(decayed, training_config.recency_min_weight, 1.0)
+    train_mean = float(np.mean(decayed[train_endpoints]))
+    if np.isfinite(train_mean) and train_mean > 0:
+        decayed /= train_mean
+    weights[:] = decayed.astype(np.float32)
+    return weights
+
+
+def _class_frequency(values: np.ndarray, classes: int) -> np.ndarray:
+    counts = np.bincount(values.astype(np.int64), minlength=classes).astype(np.float64)
+    return counts / max(float(counts.sum()), 1.0)
+
+
+def _jensen_shannon(left: np.ndarray, right: np.ndarray) -> float:
+    epsilon = 1e-12
+    p = np.clip(np.asarray(left, dtype=np.float64), epsilon, 1.0)
+    q = np.clip(np.asarray(right, dtype=np.float64), epsilon, 1.0)
+    p /= p.sum()
+    q /= q.sum()
+    middle = 0.5 * (p + q)
+    return float(
+        0.5 * np.sum(p * np.log(p / middle))
+        + 0.5 * np.sum(q * np.log(q / middle))
+    )
+
+
+def _is_availability_feature(column: str) -> bool:
+    """辨識資料可用性旗標；這類 0/1 欄位不做 z-score 放大。"""
+    return column.endswith("_available") or column.endswith("_context_available")
+
+
+def _build_drift_diagnostics(
+    series: Sequence[_PreparedSeries],
+    model_config: TemporalTransformerConfig,
+    training_config: TransformerTrainingConfig,
+    feature_columns: Sequence[str],
+) -> dict[str, object]:
+    """比較訓練、驗證、測試的標籤與標準化特徵分布。"""
+    label_drift: dict[str, object] = {}
+    warnings: list[str] = []
+    split_names = ("train", "validation", "test")
+    endpoint_sets = {
+        name: [getattr(item, f"{name}_endpoints") for item in series]
+        for name in split_names
+    }
+    for horizon_index, horizon in enumerate(model_config.return_horizons):
+        frequencies: dict[str, np.ndarray] = {}
+        for name in split_names:
+            values = np.concatenate(
+                [
+                    item.future_directions[endpoints, horizon_index]
+                    for item, endpoints in zip(series, endpoint_sets[name], strict=True)
+                ]
+            )
+            frequencies[name] = _class_frequency(values, 3)
+        validation_js = _jensen_shannon(frequencies["train"], frequencies["validation"])
+        test_js = _jensen_shannon(frequencies["train"], frequencies["test"])
+        hold_fraction = float(frequencies["train"][1])
+        if max(validation_js, test_js) >= training_config.drift_warning_threshold:
+            warnings.append(
+                f"{horizon} 根方向標籤分布漂移超過 {training_config.drift_warning_threshold:.3f}"
+            )
+        if not (
+            training_config.minimum_hold_fraction
+            <= hold_fraction
+            <= training_config.maximum_hold_fraction
+        ):
+            warnings.append(
+                f"{horizon} 根訓練 HOLD 比例 {hold_fraction:.3f} 不在 "
+                f"{training_config.minimum_hold_fraction:.3f}～"
+                f"{training_config.maximum_hold_fraction:.3f}"
+            )
+        label_drift[str(horizon)] = {
+            "train_frequencies": frequencies["train"].tolist(),
+            "validation_frequencies": frequencies["validation"].tolist(),
+            "test_frequencies": frequencies["test"].tolist(),
+            "validation_js_divergence": validation_js,
+            "test_js_divergence": test_js,
+        }
+
+    feature_means: dict[str, np.ndarray] = {}
+    for name in split_names:
+        blocks = [
+            item.features[endpoints]
+            for item, endpoints in zip(series, endpoint_sets[name], strict=True)
+        ]
+        feature_means[name] = np.mean(np.concatenate(blocks, axis=0), axis=0)
+    validation_shift = np.abs(feature_means["validation"] - feature_means["train"])
+    test_shift = np.abs(feature_means["test"] - feature_means["train"])
+    availability_drift: list[dict[str, float | str]] = []
+    for index, column in enumerate(feature_columns):
+        if not _is_availability_feature(str(column)):
+            continue
+        validation_delta = float(validation_shift[index])
+        test_delta = float(test_shift[index])
+        maximum_delta = max(validation_delta, test_delta)
+        availability_drift.append(
+            {
+                "feature": str(column),
+                "train_rate": float(feature_means["train"][index]),
+                "validation_rate": float(feature_means["validation"][index]),
+                "test_rate": float(feature_means["test"][index]),
+                "maximum_absolute_rate_shift": maximum_delta,
+            }
+        )
+        if maximum_delta >= training_config.availability_drift_warning_threshold:
+            warnings.append(
+                f"{column} 可用率漂移 {maximum_delta:.3f} 超過 "
+                f"{training_config.availability_drift_warning_threshold:.3f}"
+            )
+    ranked = np.argsort(-np.maximum(validation_shift, test_shift), kind="stable")[:20]
+    top_feature_shifts = [
+        {
+            "feature": str(feature_columns[index]),
+            "validation_absolute_z_shift": float(validation_shift[index]),
+            "test_absolute_z_shift": float(test_shift[index]),
+        }
+        for index in ranked
+    ]
+    return {
+        "schema_version": 1,
+        "label_drift": label_drift,
+        "feature_mean_absolute_z_shift": {
+            "validation_mean": float(np.mean(validation_shift)),
+            "validation_max": float(np.max(validation_shift)),
+            "test_mean": float(np.mean(test_shift)),
+            "test_max": float(np.max(test_shift)),
+        },
+        "top_feature_shifts": top_feature_shifts,
+        "availability_drift": availability_drift,
+        "split_policy": {
+            "purge_bars": max(model_config.return_horizons),
+            "embargo_bars": training_config.embargo_bars,
+            "recency_half_life_days": training_config.recency_half_life_days,
+            "recency_min_weight": training_config.recency_min_weight,
+        },
+        "warnings": warnings,
+        "passed": not warnings,
+    }
 
 
 def _safe_scale(values: np.ndarray, axis: int | None = None) -> np.ndarray:
@@ -836,17 +1069,38 @@ def prepare_transformer_datasets(
     training_config: TransformerTrainingConfig,
 ) -> PreparedTransformerData:
     """讀取多市場特徵資料，使用純時間切分建立訓練、驗證與測試集。"""
+    from ai_quant_trading.transformer.strategy_events import (
+        StrategyEventConfig, prepare_event_frame, build_event_outcomes,
+    )
+
     paths = tuple(Path(path).resolve() for path in source_paths)
     if not paths:
         raise ValueError("至少選擇一份特徵 CSV")
-    loaded = [_load_source(path, training_config.max_rows_per_source) for path in paths]
+    event_mode = training_config.trading_target_mode == "strategy_event"
+    event_config = (
+        StrategyEventConfig(**training_config.strategy_event_config) if event_mode else None
+    )
+    if event_config and model_config.return_horizons != (event_config.max_holding_bars,):
+        raise ValueError("事件模式只使用一個持有上限，return_horizons 必須等於 max_holding_bars")
+    loaded = [_load_source(path, training_config.max_rows_per_source, strategy_event=event_mode)
+              for path in paths]
     frames = [item[0] for item in loaded]
+    if event_config:
+        frames = [prepare_event_frame(frame, event_config) for frame in frames]
     sources = tuple(item[1] for item in loaded)
     intervals = {source.interval for source in sources if source.interval}
     if len(intervals) > 1:
         raise ValueError("同一次訓練只能使用相同 K 線週期的資料")
 
-    feature_columns = _select_feature_columns(frames, model_config.input_features)
+    if event_config:
+        # 僅使用這個版本自行建立的比例特徵與當下候選方向，不讓成交標籤滲入。
+        feature_columns = tuple(column for column in frames[0]
+                                if column.startswith("mtf_")
+                                or column in {"candidate_side", "hour_sin", "hour_cos"})
+        if len(feature_columns) > model_config.input_features:
+            raise ValueError("事件特徵上限不足；input_features 至少需要 53")
+    else:
+        feature_columns = _select_feature_columns(frames, model_config.input_features)
     feature_columns = _prune_training_features(
         frames,
         feature_columns,
@@ -854,7 +1108,7 @@ def prepare_transformer_datasets(
     )
     if not feature_columns:
         raise ValueError("Transformer 訓練區段沒有任何可用數值特徵")
-    max_horizon = max(model_config.return_horizons)
+    max_horizon = max(model_config.return_horizons) + int(event_mode)
     raw_series: list[dict[str, object]] = []
     training_feature_blocks: list[np.ndarray] = []
     training_return_blocks: list[np.ndarray] = []
@@ -869,6 +1123,33 @@ def prepare_transformer_datasets(
         feature_values = numeric.replace([np.inf, -np.inf], np.nan).to_numpy(dtype=np.float64)
         feature_mask = np.isfinite(feature_values).astype(np.float32)
         targets = _v3_targets(frame, model_config, training_config)
+        event_metadata: dict[str, np.ndarray] = {}
+        eligible = np.ones(len(frame), dtype=bool)
+        if event_config:
+            outcomes = build_event_outcomes(
+                frame, event_config, fee_bps_per_side=training_config.fee_bps_per_side,
+                slippage_bps_per_side=training_config.slippage_bps_per_side,
+            )
+            if outcomes.empty:
+                raise ValueError("資料沒有符合固定策略的候選事件，請增加歷史資料")
+            points = outcomes["endpoint"].to_numpy(dtype=int)
+            eligible[:] = False
+            eligible[points] = True
+            targets["future_returns"] = np.zeros((len(frame), 1))
+            targets["future_returns"][points, 0] = outcomes["net_return"].to_numpy()
+            profitable = outcomes["net_return"].to_numpy() > training_config.direction_threshold_bps / 10_000
+            labels = np.where(profitable, np.where(outcomes["side"] == 1, 2, 0), 1)
+            targets["future_directions"][points, 0] = labels
+            targets["tradeability"][points, 0] = profitable
+            outcomes["exit_reason_code"] = outcomes["exit_reason"].map(
+                {"stop": 0, "target": 1, "time": 2, "regime": 3}
+            )
+            for column in ("entry_endpoint", "exit_endpoint", "side", "entry_price",
+                           "exit_price", "stop_price", "target_price", "fee_return",
+                           "funding_return", "exit_reason_code"):
+                values = np.zeros(len(frame))
+                values[points] = outcomes[column].to_numpy()
+                event_metadata[column] = values
         future_returns = targets["future_returns"]
         future_directions = targets["future_directions"]
         movement_directions = targets["movement_directions"]
@@ -885,7 +1166,12 @@ def prepare_transformer_datasets(
             max_horizon,
             training_config.train_fraction,
             training_config.validation_fraction,
+            training_config.embargo_bars,
         )
+        if event_mode:
+            train_ep = train_ep[eligible[train_ep]]
+            validation_ep = validation_ep[eligible[validation_ep]]
+            test_ep = test_ep[eligible[test_ep]]
         if not len(train_ep) or not len(validation_ep) or not len(test_ep):
             raise ValueError("資料不足以完成時間切分；請增加 K 線筆數、縮短序列或縮短預測週期")
         training_feature_blocks.append(feature_values[:train_cut])
@@ -897,6 +1183,9 @@ def prepare_transformer_datasets(
         training_volatility_regime_blocks.append(volatility_regime_source[train_ep])
         raw_series.append(
             {
+                "timestamps_ns": pd.to_datetime(frame["timestamp"], utc=True).astype(
+                    "datetime64[ns, UTC]"
+                ).astype("int64").to_numpy(),
                 "features": feature_values,
                 "feature_mask": feature_mask,
                 "future_returns": future_returns,
@@ -909,9 +1198,15 @@ def prepare_transformer_datasets(
                 "future_excursions": future_excursions,
                 "tradeability": tradeability,
                 "volatility_regime_source": volatility_regime_source,
+                "sample_weights": _recency_sample_weights(
+                    frame,
+                    train_ep,
+                    training_config,
+                ),
                 "train_endpoints": train_ep,
                 "validation_endpoints": validation_ep,
                 "test_endpoints": test_ep,
+                "event_metadata": event_metadata,
             }
         )
 
@@ -921,6 +1216,15 @@ def prepare_transformer_datasets(
     filled_train = np.where(np.isfinite(train_features), train_features, medians)
     means = np.mean(filled_train, axis=0)
     scales = _safe_scale(filled_train, axis=0)
+    # 近乎固定的可用性旗標若做 z-score，單一缺值會被放大成數百倍異常值。
+    # 保留原始 0/1 尺度，讓模型能辨識缺資料，但不讓旗標壓過價格與風險特徵。
+    availability_indices = [
+        index for index, column in enumerate(feature_columns)
+        if _is_availability_feature(str(column))
+    ]
+    if availability_indices:
+        means[np.asarray(availability_indices, dtype=np.int64)] = 0.0
+        scales[np.asarray(availability_indices, dtype=np.int64)] = 1.0
 
     train_returns = np.concatenate(training_return_blocks)
     return_means = np.nanmean(train_returns, axis=0)
@@ -987,19 +1291,24 @@ def prepare_transformer_datasets(
         feature_group_ids=feature_group_ids,
         feature_group_names=FEATURE_GROUP_NAMES,
         label_mode=(
-            "hierarchical_movement_side_cost_aware_tradeability"
+            "strategy_event_net_pnl_v1"
+            if event_mode
+            else "terminal_net_cost_aware_tradeability"
+            if training_config.trading_target_mode == "terminal_net"
+            else "hierarchical_first_touch_cost_aware_tradeability"
             if model_config.hierarchical_direction
-            else "next_open_cost_aware_long_short"
+            else "first_touch_cost_aware_long_short"
         ),
     )
 
     prepared_series: list[_PreparedSeries] = []
-    for item in raw_series:
+    for series_index, item in enumerate(raw_series):
         raw_features = np.asarray(item["features"], dtype=np.float64)
         filled = np.where(np.isfinite(raw_features), raw_features, medians)
         standardized = ((filled - means) / scales).astype(np.float32)
         prepared_series.append(
             _PreparedSeries(
+                timestamps_ns=np.asarray(item["timestamps_ns"], dtype=np.int64),
                 features=standardized,
                 feature_mask=np.asarray(item["feature_mask"], dtype=np.float32),
                 future_returns=np.asarray(item["future_returns"], dtype=np.float32),
@@ -1030,12 +1339,18 @@ def prepare_transformer_datasets(
                     item["volatility_regime_source"],
                     dtype=np.float32,
                 ),
+                sample_weights=np.asarray(item["sample_weights"], dtype=np.float32),
                 train_endpoints=np.asarray(item["train_endpoints"], dtype=np.int64),
                 validation_endpoints=np.asarray(
                     item["validation_endpoints"],
                     dtype=np.int64,
                 ),
                 test_endpoints=np.asarray(item["test_endpoints"], dtype=np.int64),
+                event_metadata=item["event_metadata"],
+                source_key=int(hashlib.sha256(
+                    f"{sources[series_index].exchange}|{sources[series_index].symbol}|"
+                    f"{sources[series_index].interval}".encode("utf-8")
+                ).hexdigest()[:15], 16),
             )
         )
 
@@ -1049,6 +1364,9 @@ def prepare_transformer_datasets(
         dropout=model_config.dropout,
         latent_dim=model_config.latent_dim,
         return_horizons=model_config.return_horizons,
+        timing_horizon=model_config.timing_horizon,
+        primary_horizon=model_config.primary_horizon,
+        regime_horizon=model_config.regime_horizon,
         regime_classes=model_config.regime_classes,
         architecture_version=model_config.architecture_version,
         local_kernel_size=model_config.local_kernel_size,
@@ -1061,6 +1379,21 @@ def prepare_transformer_datasets(
         hierarchical_direction=model_config.hierarchical_direction,
         horizon_adapter_dim=model_config.horizon_adapter_dim,
     )
+    diagnostics = _build_drift_diagnostics(
+        prepared_series,
+        resolved_config,
+        training_config,
+        feature_columns,
+    )
+    if event_config:
+        diagnostics["strategy_event_contract"] = {
+            "version": "btc_breakout_event_v1", "research_only": True,
+            "rules": event_config.to_dict(), "feature_count": len(feature_columns),
+            "funding": "assumed_two_sided_reserve_at_utc_8h_settlement",
+            "tax": "unverified", "execution": "next_open_stop_first_15m",
+            "purge_bars": max_horizon,
+            "exit_reason_codes": {"0": "stop", "1": "target", "2": "time", "3": "regime"},
+        }
     return PreparedTransformerData(
         train=MarketSequenceDataset(
             prepared_series,
@@ -1083,4 +1416,5 @@ def prepare_transformer_datasets(
         scaler=scaler,
         sources=sources,
         resolved_model_config=resolved_config,
+        diagnostics=diagnostics,
     )

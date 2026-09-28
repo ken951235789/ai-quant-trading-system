@@ -156,3 +156,36 @@ def test_btc_bundle_contains_all_standard_timeframes_and_indicator_groups() -> N
         for features in MULTITIMEFRAME_FEATURE_GROUPS.values():
             for feature in features:
                 assert f"mtf_{interval}_{feature}" in fused
+
+
+def test_derivative_context_is_causally_propagated_to_other_timeframes() -> None:
+    five_times = pd.date_range("2025-01-01", periods=180, freq="5min", tz="UTC")
+    fifteen_times = pd.date_range("2025-01-01", periods=60, freq="15min", tz="UTC")
+    hourly_times = pd.date_range("2025-01-01", periods=16, freq="h", tz="UTC")
+    five = _feature_frame("5m", five_times, np.linspace(0.0, 0.01, len(five_times)))
+    fifteen = _feature_frame(
+        "15m", fifteen_times, np.linspace(0.0, 0.01, len(fifteen_times))
+    )
+    hourly = _feature_frame("1h", hourly_times, np.linspace(0.0, 0.01, len(hourly_times)))
+    for frame in (five, hourly):
+        frame["funding_rate"] = np.nan
+        frame["open_interest"] = np.nan
+        frame["open_interest_change"] = np.nan
+        # 即使其他週期有完整 spread，也必須選擇欄位較完整的 15m 作為來源。
+        frame["spread_bps"] = 3.0
+    fifteen["funding_rate"] = np.linspace(0.00001, 0.00003, len(fifteen))
+    fifteen["open_interest"] = np.linspace(10_000, 11_000, len(fifteen))
+    fifteen["open_interest_change"] = fifteen["open_interest"].pct_change()
+    fifteen["spread_bps"] = 2.0
+
+    fused, _ = build_multitimeframe_frame(
+        {"5m": five, "15m": fifteen, "1h": hourly},
+        "5m",
+    )
+
+    assert fused.iloc[-1]["mtf_5m_derivatives_available"] == 1.0
+    assert fused.iloc[-1]["mtf_1h_derivatives_available"] == 1.0
+    assert fused.iloc[-1]["mtf_5m_funding_available"] == 1.0
+    assert fused.iloc[-1]["mtf_1h_open_interest_available"] == 1.0
+    assert fused.iloc[-1]["mtf_1h_spread_available"] == 1.0
+    assert fused["mtf_1h_funding_rate"].iloc[-1] > 0.0

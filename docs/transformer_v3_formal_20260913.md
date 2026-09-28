@@ -93,8 +93,8 @@
 
 ## 成品位置
 
-- Kaggle 執行頁：<https://www.kaggle.com/code/ezkenn/ai-quant-btc-transformer-v3-formal-training>
-- Kaggle 私人資料集：<https://www.kaggle.com/datasets/ezkenn/ai-quant-btc-transformer-v3-formal-input>
+- Kaggle 執行頁：由自己的 `kernel-metadata.json` 中 `id` 查詢。
+- Kaggle 私人資料集：由自己的 `dataset-metadata.json` 中 `id` 查詢，不公開帳號資訊。
 - 本機下載根目錄：`outputs/kaggle_transformer_v3_formal/result/`
 - 模型與訓練結果：`outputs/kaggle_transformer_v3_formal/result/transformer_v3_formal/20260913T054824732636Z_btc_15m_mtf_v3_formal_seed42/`
 - 本機推論驗證：`outputs/kaggle_transformer_v3_formal/result/latest_inference_smoke.json`
@@ -105,7 +105,7 @@
 建立安全資料包：
 
 ```powershell
-python scripts\build_kaggle_transformer_v3_formal.py --username ezkenn
+python scripts\build_kaggle_transformer_v3_formal.py --username YOUR_KAGGLE_USERNAME
 ```
 
 建立或更新私人 Dataset 後，提交 T4 Kernel：

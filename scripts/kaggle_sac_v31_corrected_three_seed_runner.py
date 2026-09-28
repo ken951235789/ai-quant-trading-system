@@ -247,12 +247,12 @@ def main() -> int:
         if len(oos) < 10_000:
             raise RuntimeError(f"Transformer 樣本外資料僅 {len(oos):,} 列，不足以訓練 SAC")
 
-        # 用 5 根預測報酬評估方向是否足以支付來回成本；此欄只給撮合風控使用。
-        oos = attach_expected_return(oos, build_expected_return_contract(5))
+        # 20 根預測負責主要交易方向；5 根只保留為進場 timing。
+        oos = attach_expected_return(oos, build_expected_return_contract(20))
         expected_return_coverage = float(oos["expected_return"].notna().mean())
         if expected_return_coverage < 0.99:
             raise RuntimeError(
-                f"Transformer 5 根預期報酬覆蓋率僅 {expected_return_coverage:.2%}"
+                f"Transformer 20 根預期報酬覆蓋率僅 {expected_return_coverage:.2%}"
             )
 
         missing = [column for column in feature_columns if column not in oos]
@@ -275,11 +275,11 @@ def main() -> int:
             max_drawdown_limit=0.10,
             episode_length=2_016,
             random_start=True,
-            holding_period_reference=5,
+            holding_period_reference=20,
             include_position_context=True,
             expert_kind="short_term",
             # deadband 使用實際持倉比例；2% 可抑制小調倉，又不會封死 10% 以上訊號。
-            rebalance_deadband=0.02,
+            rebalance_deadband=0.01,
             minimum_holding_bars=4,
             soft_drawdown_limit=0.06,
             soft_drawdown_multiplier=0.50,
@@ -291,8 +291,8 @@ def main() -> int:
             normalized_action_space=True,
             include_risk_context=True,
             include_trade_plan_context=True,
-            neutral_action_threshold=0.10,
-            action_semantics="hold_close_target",
+            neutral_action_threshold=0.0,
+            action_semantics="continuous_target",
             hold_action_threshold=0.03,
             close_action_threshold=0.10,
             leverage=2.0,
@@ -347,13 +347,13 @@ def main() -> int:
             deterministic_eval=True,
             save_replay_buffer=False,
             sac_buffer_size=400_000,
-            sac_learning_starts=10_000,
+            sac_learning_starts=20_000,
             sac_tau=0.005,
             sac_train_freq=1,
             sac_gradient_steps=1,
-            sac_ent_coef="auto",
+            sac_ent_coef="auto_0.01",
             sac_action_noise="normal",
-            sac_action_noise_sigma=0.03,
+            sac_action_noise_sigma=0.05,
         )
         last_percent = -1
 
@@ -412,12 +412,12 @@ def main() -> int:
                 "end": str(oos.iloc[-1]["timestamp"]),
             },
             "corrected_contract": {
-                "expected_return": "transformer_return_5（分析情境，不作訓練期硬閘門）",
+                "expected_return": "transformer_return_20（主要交易情境，不作訓練期硬閘門）",
                 "minimum_gross_target_cost_multiple": 0.0,
                 "take_profit_distance": 0.015,
                 "maximum_stop_distance": 0.0075,
-                "neutral_action_threshold": 0.10,
-                "rebalance_deadband": 0.02,
+                "neutral_action_threshold": 0.0,
+                "rebalance_deadband": 0.01,
                 "turnover_penalty": 0.01,
                 "previous_failure": (
                     "風控啟用 minimum_net_risk_reward，卻沒有 expected_return 或固定停利，"

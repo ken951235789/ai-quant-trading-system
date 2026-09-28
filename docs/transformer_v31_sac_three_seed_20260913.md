@@ -47,7 +47,8 @@ Transformer V3.1 將方向分析拆成三個互相協作的任務：
 
 ## 執行狀態
 
-Kaggle 任務：`ezkenn/ai-quant-btc-transformer-sac-v31-three-seed`
+Kaggle 任務：`YOUR_KAGGLE_USERNAME/ai-quant-btc-transformer-sac-v31-three-seed`。
+這是路徑格式範例；實際私人工作 ID 不在公開文件提供。
 
 完整任務已於 2026-09-14 完成，總耗時約 7 小時 33 分。
 
@@ -79,7 +80,7 @@ Kaggle 任務：`ezkenn/ai-quant-btc-transformer-sac-v31-three-seed`
 - 中性動作與再平衡死區由 5% 改為 3%，避免過度壓抑 SAC 的早期探索。
 - Final holdout 在第一輪未被開啟，沒有因除錯而污染。
 
-修正版任務：`ezkenn/ai-quant-btc-sac-v31-corrected-three-seed`
+修正版任務：`YOUR_KAGGLE_USERNAME/ai-quant-btc-sac-v31-corrected-three-seed`。
 
 ### 修正版 200k SAC 篩選結果
 

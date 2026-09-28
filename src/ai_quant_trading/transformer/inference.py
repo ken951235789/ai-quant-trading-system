@@ -203,6 +203,10 @@ def _load_checkpoint(path: Path, device: torch.device) -> dict[str, object]:
     missing = sorted(required.difference(payload))
     if missing:
         raise ValueError(f"Transformer checkpoint 缺少欄位：{missing}")
+    if (payload.get("artifact_kind") == "strategy_event_research_v1"
+            or payload.get("training_config", {}).get("trading_target_mode") == "strategy_event"
+            or payload.get("scaler", {}).get("label_mode") == "strategy_event_net_pnl_v1"):
+        raise ValueError("策略事件研究模型不能直接接入舊版 SAC／模擬盤／實盤推論管線")
     return payload
 
 

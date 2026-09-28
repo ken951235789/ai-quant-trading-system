@@ -1,5 +1,37 @@
 # Transformer 時序模型
 
+## 固定策略事件研究模式
+
+新增明確選用的 `strategy_event`，不是既有模擬盤模型的直接替換品。
+只在 1h 趨勢確認後的 15m 突破候選上，學習包含保護出場與成本的交易淨收益、
+收益分位數及淨收益超過門檻的機率。沿用本模組的 V3、時間切分、校準與訓練器；
+沒有建立另一套訓練主程式，也沒有改動舊模型契約。
+
+使用 `configs/transformer_strategy_event.example.json` 與
+`scripts/run_transformer_strategy_event.py`；預設僅資料檢查，`--smoke` 才跑一輪小測試。
+操作、規則及限制詳見 [事件研究說明](../../../docs/transformer_strategy_event_20260924.md)。
+這類 checkpoint 明確標記 research-only，舊版 SAC／模擬盤／實盤推論入口會拒絕載入。
+
+所有新的一般訓練結果另外保存 `actual_direction_*`、市場身分、標籤契約雜湊、
+校準前機率及校準後機率。集成評估只使用原始答案；舊 CSV 缺答案時拒絕推算。
+
+## V3.4 經濟目標研究設定
+
+2026-09-24 的 Kaggle 實驗使用 `trading_target_mode="terminal_net"`：下一根開盤進場、
+持有指定 horizon 後收盤，方向、可交易性和淨優勢頭使用相同的成本後報酬定義。
+價格移動的 first-touch 頭只作輔助；舊 checkpoint 的 first-touch 契約不會被改寫。
+
+`training_horizon_weights=(0.15, 0.70, 0.15)` 同時作用於多週期訓練任務。
+驗證區間前半用於溫度校準、後半用於 checkpoint/seed 選擇，中間保留 purge/embargo。
+`checkpoint_metric="economic_selection_score"` 以不重疊固定持倉的淨期望值信賴下界選模，
+低於最低交易筆數會被否決。分數只使用當時的預測淨優勢與不利波動；不靠未來報酬選訊號。
+
+新增 `validation_predictions.csv`、`*_signal_diagnostics.csv`、`*_fixed_hold_trades.csv`，
+以及 `training.json` 內的 `calibration_protocol` 和 `economic_evaluation`。
+這是 1x 固定持倉研究診斷，不是完整逐筆成交回測；回撤只含已結算資產，資金費率是估計值。
+實驗與操作詳見 `docs/transformer_v34_economic_training_20260924.md`。
+下方 V3.1 的分類選模、高信心排序和 first-touch 主標籤敘述屬舊設定，不是本次 V3.4 契約。
+
 ## 精簡特徵契約
 
 新訓練使用「時間週期 × 指標類型」輪流挑選，排除原始 OHLCV 與美元價格指標，
@@ -36,18 +68,26 @@ Patch 投影與 RoPE Transformer 編碼，再以跨時間框注意力融合。�
 訓練會依時間順序切分 Train、Validation、Test，Scaler 只使用 Train 區段估計，
 且不同市場的 K 線不會被串成同一條序列。V3.1 可把方向任務拆成三個部分：先判斷
 價格本身向上、盤整或向下，再判斷扣除成本後是否值得交易，最後只在可交易樣本上
-學習做多或做空。各預測週期另有獨立 Adapter，避免 1、5、20 根 K 線互相拉扯。
+學習做多或做空。5 根負責進場 timing、20 根是主要交易目標、48 根提供 regime；
+Checkpoint 權重固定為 0.15／0.70／0.15，使短期雜訊不會主導選模。
 新訓練只用 Train 統計類別權重，再依 Validation 的分層平衡準確率、相對多數類
 基準提升及 Loss 組成的 `hierarchical_skill_score` 保存模型；Test 不參與選模。
+
+Train／Validation／Test 邊界會套用 purge 與 48 根 embargo，避免標籤視窗跨越資料切分。
+Train 可使用 365 天半衰期的時間衰減抽樣，讓近期市場狀態有較高權重但不抹除舊行情。
+訓練結果會輸出類別分布、Jensen-Shannon divergence 與特徵平均漂移；這些診斷是警報，
+不是看到 Test 後調參的理由。
 
 正式研究建議至少訓練 5 個固定 seeds，先依 Validation 分數選候選，再一次性查看
 Test。多 seed 的等權機率平均只能列為另一個事先定義的候選，不能在看過 Test 後
 反覆挑選 seed 或權重。方向準確率、平衡準確率、Macro F1 與多數類基準必須按每個
-預測週期分開檢查，平均數通過不代表每個週期都有優勢。
+預測週期分開檢查，平均數通過不代表每個週期都有優勢。部署閘門以主要 20 根目標的
+高信心 5%／10%／20% 樣本為主，檢查扣除 fee、slippage、spread、funding 後的
+expectancy、win rate 與 profit factor；全體樣本準確率只保留為診斷。
 
 模型輸出：
 
-- 未來 1、5、20 根 K 線的標準化報酬
+- 未來 5、20、48 根 K 線的標準化報酬
 - 扣除成本門檻後的下跌、中性、上漲機率
 - 不含交易成本的價格移動方向機率
 - 可交易樣本中的條件式做多／做空機率
@@ -62,8 +102,10 @@ Test。多 seed 的等權機率平均只能列為另一個事先定義的候選�
 - 模型不確定度
 - 可供 SAC 使用的壓縮時序向量
 
-v3 的交易標籤以「下一根開盤可成交、未來第 N 根收盤離場」建立，成本參數可在
-訓練頁調整。分類機率可使用 Validation 區段做溫度校準，Test 區段不參與校準。
+v3 的交易標籤以「下一根開盤可成交、未來 N 根內先碰到多方或空方成本障礙」建立；
+同一根 K 線同時碰到兩側時保守標記為不交易。成本障礙包含手續費、滑價、觀測價差、
+資金費率與安全邊際，參數可在訓練頁調整。分類機率可使用 Validation 區段做溫度校準，
+Test 區段不參與校準。
 這些設計能使研究假設更接近成交現實，但不保證模型具有未來獲利能力。
 
 BTC 15m 低硬體建議先使用 256 個高優先特徵、96 根序列、`d_model=96`、3 層與

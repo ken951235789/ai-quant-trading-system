@@ -95,7 +95,7 @@ def main() -> int:
             feedforward_dim=192,
             dropout=0.10,
             latent_dim=16,
-            return_horizons=(1, 5, 20),
+            return_horizons=(5, 20, 48),
             regime_classes=3,
             architecture_version=3,
             local_kernel_size=3,

@@ -20,10 +20,11 @@ DEFAULT_OUTPUT = PROJECT_ROOT / "outputs" / "kaggle_sac_v31_formal_candidate"
 DEFAULT_RUNNER = Path(__file__).with_name(
     "kaggle_sac_v31_corrected_three_seed_runner.py"
 )
-FORMAL_DATASET_ID = "ezkenn/ai-quant-btc-transformer-sac-v31-input"
+FORMAL_DATASET_SLUG = "ai-quant-btc-transformer-sac-v31-input"
 SEEDS = (11, 42)
-TOTAL_TIMESTEPS = 500_000
-WALK_FORWARD_FOLDS = 2
+TOTAL_TIMESTEPS = 1_000_000
+# 兩個 seed 各跑一個 walk-forward fold；總計兩百萬步，可控制在 Kaggle 單次工作上限內。
+WALK_FORWARD_FOLDS = 1
 
 
 def _parse_seeds(value: str) -> tuple[int, ...]:
@@ -52,6 +53,7 @@ def build_kaggle_files(
     walk_forward_folds: int,
     dataset_slug: str,
     kernel_slug: str,
+    formal_dataset_id: str | None = None,
 ) -> tuple[str, str]:
     """建立 checkpoint、工作設定與私人 Kaggle Kernel。"""
     dataset_dir = output_dir / "candidate_dataset"
@@ -108,7 +110,9 @@ def build_kaggle_files(
                 "enable_gpu": True,
                 "enable_internet": False,
                 "machine_shape": "NvidiaTeslaT4",
-                "dataset_sources": [FORMAL_DATASET_ID, dataset_id],
+                "dataset_sources": [
+                    formal_dataset_id or f"{username}/{FORMAL_DATASET_SLUG}", dataset_id,
+                ],
                 "competition_sources": [],
                 "kernel_sources": [],
                 "model_sources": [],
@@ -123,11 +127,12 @@ def build_kaggle_files(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="建立配額節制版 SAC 正式候選")
-    parser.add_argument("--username", default="ezkenn")
+    parser.add_argument("--username", required=True, help="自己的 Kaggle 帳號")
+    parser.add_argument("--formal-dataset", help="行情 Dataset 的 owner/slug；預設使用自己的帳號")
     parser.add_argument("--result-root", type=Path, default=DEFAULT_RESULT_ROOT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--runner", type=Path, default=DEFAULT_RUNNER)
-    parser.add_argument("--profile", default="quota_aware_formal_candidate_500k")
+    parser.add_argument("--profile", default="formal_candidate_1m_two_seed")
     parser.add_argument("--seeds", default=",".join(str(seed) for seed in SEEDS))
     parser.add_argument("--timesteps", type=int, default=TOTAL_TIMESTEPS)
     parser.add_argument("--folds", type=int, default=WALK_FORWARD_FOLDS)
@@ -158,6 +163,7 @@ def main() -> int:
         walk_forward_folds=args.folds,
         dataset_slug=args.dataset_slug,
         kernel_slug=args.kernel_slug,
+        formal_dataset_id=args.formal_dataset,
     )
     print(f"SAC 工作設定：seeds={seeds}、每個 run={args.timesteps:,} steps")
     print(f"Kaggle Dataset：{dataset_id}")

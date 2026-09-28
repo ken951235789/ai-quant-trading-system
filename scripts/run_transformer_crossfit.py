@@ -31,13 +31,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="模型與 OOS 預測輸出資料夾",
     )
     parser.add_argument("--folds", type=int, default=4)
-    parser.add_argument("--mode", choices=["expanding", "rolling"], default="expanding")
+    parser.add_argument("--mode", choices=["expanding", "rolling"], default="rolling")
     parser.add_argument("--initial-train-fraction", type=float, default=0.40)
     parser.add_argument("--final-holdout-fraction", type=float, default=0.10)
     parser.add_argument("--minimum-fit-rows", type=int, default=35_000)
     parser.add_argument("--minimum-oos-rows", type=int, default=8_000)
     parser.add_argument("--minimum-final-holdout-rows", type=int, default=8_000)
-    parser.add_argument("--rolling-train-rows", type=int)
+    parser.add_argument("--rolling-train-rows", type=int, default=105_120)
+    parser.add_argument("--embargo-bars", type=int, default=48)
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=96)
     parser.add_argument("--seed", type=int, default=11)
@@ -58,7 +59,7 @@ def main() -> int:
         feedforward_dim=384,
         dropout=0.15,
         latent_dim=24,
-        return_horizons=(1, 5, 20),
+        return_horizons=(5, 20, 48),
         patch_size=8,
         patch_stride=4,
         hierarchical_direction=True,
@@ -87,7 +88,7 @@ def main() -> int:
         quantile_loss_weight=0.15,
         direction_threshold_bps=12.0,
         movement_threshold_bps=2.0,
-        movement_atr_multiplier=0.10,
+        movement_atr_multiplier=0.50,
         label_smoothing=0.01,
         fee_bps_per_side=4.0,
         slippage_bps_per_side=2.0,
@@ -95,7 +96,10 @@ def main() -> int:
         excursion_loss_weight=0.20,
         tradeability_loss_weight=0.75,
         volatility_regime_loss_weight=0.10,
-        checkpoint_metric="hierarchical_skill_score",
+        checkpoint_metric="deployment_horizon_skill_score",
+        checkpoint_horizon_weights=(0.15, 0.70, 0.15),
+        embargo_bars=args.embargo_bars,
+        recency_half_life_days=365.0,
     )
     crossfit = TransformerCrossFitConfig(
         folds=args.folds,
@@ -106,6 +110,8 @@ def main() -> int:
         minimum_oos_rows=args.minimum_oos_rows,
         minimum_final_holdout_rows=args.minimum_final_holdout_rows,
         rolling_train_rows=args.rolling_train_rows,
+        expected_return_horizon=20,
+        embargo_bars=args.embargo_bars,
     )
 
     def progress(payload: dict[str, object]) -> None:

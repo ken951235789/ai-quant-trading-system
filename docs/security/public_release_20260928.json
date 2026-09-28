@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "SECURITY_REVIEW-20260928-7D25F499",
+  "report_type": "security_review",
+  "generated_at_utc": "2026-09-28T15:51:22Z",
+  "project": {
+    "name": "AIQuantTradingSystem-Public",
+    "revision": "7cabfb0 + 20260928 publication changes",
+    "environment": "Windows, Python 3.13, torch 2.13.0; local CPU tests"
+  },
+  "scope": "Public source snapshot, Git index and reachable history; excludes local datasets and credentials",
+  "overall_status": "WARN",
+  "summary": "公開來源與去識別研究摘要已整理；快照及既有歷史未發現可辨識憑證。完整測試通過，仍有固定暫存目錄等靜態提醒，不構成實盤或零漏洞認證。",
+  "changes": [
+    "同步 Transformer 成本後評估、策略事件研究、SAC 輸入消融與 Kaggle 工具。",
+    "公開彙總研究結果，不公開行情、權重、完整預測、帳戶或私有操作報告。",
+    "Kaggle 帳號改為必要參數，Dataset owner 可指定；移除目前文件的固定私人工作識別字。",
+    "新增 index blob 邊界檢查與 CI 測試，保留既有公開版安全修正。"
+  ],
+  "findings": [
+    {
+      "id": "SEC-001", "severity": "MEDIUM", "status": "OPEN", "category": "隔離與暫存",
+      "component": "Kaggle runners", "title": "九項固定暫存目錄 B108 提醒",
+      "evidence": ["Bandit 1.9.4: 9 medium B108, 0 high"],
+      "impact": "不受信任的共享主機可能有路徑碰撞或預先建立路徑風險。",
+      "recommendation": "僅在隔離研究環境執行，後續改為每次執行的安全暫存目錄。"
+    },
+    {
+      "id": "SEC-002", "severity": "LOW", "status": "ACCEPTED", "category": "歷史識別字",
+      "component": "舊公開提交", "title": "舊提交仍有非秘密 Kaggle 識別字",
+      "evidence": ["目前 builder 改用 username 參數；未重寫既有 Git 歷史"],
+      "impact": "移除目前檔案不會清除歷史或外部快取中的非秘密帳號名稱。",
+      "recommendation": "不要將帳號識別字當認證資料；真實秘密一旦公開必須撤銷，不能只刪檔。"
+    }
+  ],
+  "checks": [
+    {"id": "CHECK-001", "name": "既有公開歷史秘密掃描", "status": "PASS", "evidence": ["Gitleaks 8.30.1 git --log-opts=--all --redact: 12 commits, no leaks"]},
+    {"id": "CHECK-002", "name": "暫存快照秘密與邊界掃描", "status": "PASS", "evidence": ["Gitleaks dir --redact: no leaks", "check_public_repository.py --staged: findings=[]"]},
+    {"id": "CHECK-003", "name": "完整測試", "status": "PASS", "evidence": ["pytest -q: 564 passed, 4 subtests passed"], "duration_seconds": 94.64},
+    {"id": "CHECK-004", "name": "語法與靜態品質", "status": "PASS", "evidence": ["Ruff all checks passed", "compileall src scripts", "git diff --cached --check"]},
+    {"id": "CHECK-005", "name": "固定依賴已知漏洞", "status": "PASS", "evidence": ["pip-audit 2.10.1; Windows CPU lock; 123 packages, 0 vulnerabilities, 0 skipped"]},
+    {"id": "CHECK-006", "name": "Bandit", "status": "WARN", "evidence": ["0 high, 9 medium, 51 low; existing SQL identifier annotations preserved"]},
+    {"id": "CHECK-007", "name": "離線 Demo 與 Kaggle metadata", "status": "PASS", "evidence": ["360 synthetic bars; HTML and JSON generated", "owner default and Dataset override checked without API access"]}
+  ],
+  "metrics": {"tests_passed": 564, "subtests_passed": 4, "locked_dependencies_audited": 123, "known_vulnerabilities": 0, "bandit_high": 0, "bandit_medium": 9, "bandit_low": 51},
+  "artifacts": [
+    {"path": "docs/SECURITY_AUDIT_20260928.md", "role": "公開檢查範圍與限制"},
+    {"path": "docs/research/strategy_event_20260924.json", "role": "去識別化研究摘要"}
+  ],
+  "residual_risks": ["沒有執行滲透測試或真實下單。", "固定暫存目錄提醒尚未全部處理。", "未檢查所有外部 fork、快取或 GitHub 帳戶後台設定。", "公開版不含模型與資料，不能取代私人完整備份。", "套件掃描只涵蓋固定清單及本次漏洞資料。"],
+  "next_actions": ["公開提交後核對遠端 HEAD 與 CI。", "後續改善 Kaggle runner 暫存隔離，並定期重跑依賴與秘密掃描。"]
+}

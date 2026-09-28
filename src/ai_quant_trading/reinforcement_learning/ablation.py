@@ -7,6 +7,18 @@ from dataclasses import dataclass, replace
 from ai_quant_trading.reinforcement_learning.config import PortfolioEnvConfig
 
 
+def build_sac_observation_ablations(columns: list[str]) -> dict[str, list[str]]:
+    """固定價格特徵，只改變 SAC 能看見的分析師資訊。"""
+    market = [column for column in columns if not column.startswith("u_transformer_")]
+    risk = [column for column in columns if column in {
+        "u_transformer_volatility", "u_transformer_uncertainty",
+        "u_transformer_volatility_regime_high_probability", "u_transformer_available",
+    }]
+    if not market or not risk:
+        raise ValueError("SAC 輸入對照需要市場特徵與 Transformer 風險特徵")
+    return {"market_only": market, "market_plus_risk": market + risk, "full_transformer": list(columns)}
+
+
 @dataclass(frozen=True, slots=True)
 class SACEnvironmentAblation:
     """一組只能用驗證集比較、不可偷看 final holdout 的環境設定。"""

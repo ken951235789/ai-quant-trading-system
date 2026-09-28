@@ -122,8 +122,13 @@ def test_dataset_excludes_future_targets_and_uses_time_splits(tmp_path: Path) ->
     assert sample["tradeability"].shape == (2,)
     assert sample["movement_directions"].shape == (2,)
     assert sample["future_sides"].shape == (2,)
-    assert prepared.scaler.label_mode == ("hierarchical_movement_side_cost_aware_tradeability")
+    assert prepared.scaler.label_mode == ("hierarchical_first_touch_cost_aware_tradeability")
     assert len(prepared.scaler.feature_group_ids) == len(prepared.scaler.feature_columns)
+    assert prepared.diagnostics["split_policy"]["purge_bars"] == 2
+    assert "label_drift" in prepared.diagnostics
+    assert prepared.diagnostics["top_feature_shifts"][0]["feature"] in (
+        prepared.scaler.feature_columns
+    )
 
 
 def test_dataset_prioritizes_all_multitimeframe_scales(tmp_path: Path) -> None:
@@ -181,6 +186,27 @@ def test_feature_pruning_uses_training_slice_for_constants_and_duplicates(
     assert "ema_20_50_atr" in selected
     assert "macd_histogram_atr" not in selected
     assert "adx_14" not in selected
+
+
+def test_availability_flags_keep_binary_scale_and_report_drift(tmp_path: Path) -> None:
+    source = _write_feature_csv(tmp_path / "availability.csv", rows=320)
+    frame = pd.read_csv(source)
+    frame["derivatives_available"] = 1.0
+    frame.loc[240:, "derivatives_available"] = 0.0
+    frame.to_csv(source, index=False)
+    model_config, training_config = _configs()
+    model_config = replace(model_config, input_features=64)
+
+    prepared = prepare_transformer_datasets([source], model_config, training_config)
+
+    index = prepared.scaler.feature_columns.index("derivatives_available")
+    assert prepared.scaler.means[index] == 0.0
+    assert prepared.scaler.scales[index] == 1.0
+    drift = {
+        item["feature"]: item for item in prepared.diagnostics["availability_drift"]
+    }
+    assert drift["derivatives_available"]["test_rate"] == 0.0
+    assert any("derivatives_available" in warning for warning in prepared.diagnostics["warnings"])
 
 
 def test_nine_timeframe_dataset_keeps_every_financial_indicator(tmp_path: Path) -> None:
@@ -249,6 +275,7 @@ def test_two_epoch_training_saves_complete_artifacts(tmp_path: Path) -> None:
     assert "direction_majority_baseline" in result.metrics
     assert "direction_skill_score" in result.metrics
     assert "deployment_horizon_skill_score" in result.metrics
+    assert "selective_1_coverage_10_expectancy" in result.metrics
     assert updates[-1]["status"] == "complete"
     history = pd.read_csv(result.history_csv)
     assert len(history) == 2
@@ -258,6 +285,8 @@ def test_two_epoch_training_saves_complete_artifacts(tmp_path: Path) -> None:
     assert "validation_deployment_horizon_skill_score" in history
     summary = json.loads(result.summary_json.read_text(encoding="utf-8"))
     assert summary["checkpoint_metric"] == "hierarchical_skill_score"
+    assert "validation_selection_metrics" in summary
+    assert "selective_1_coverage_10_expectancy" in summary["validation_selection_metrics"]
     assert len(summary["training_class_balance"]["direction_class_weights"]) == 2
     assert len(summary["training_class_balance"]["tradeability_pos_weights"]) == 2
     assert len(summary["training_class_balance"]["side_class_weights"]) == 2
@@ -274,3 +303,20 @@ def test_two_epoch_training_saves_complete_artifacts(tmp_path: Path) -> None:
     assert "movement_up_probability_2" in predictions
     assert "side_up_probability_2" in predictions
     assert "timeframe_fast_attention" in predictions
+
+
+def test_recency_weighting_and_embargo_are_applied(tmp_path: Path) -> None:
+    source = _write_feature_csv(tmp_path / "recency.csv", rows=360)
+    model_config, training_config = _configs()
+    training_config = replace(
+        training_config,
+        embargo_bars=4,
+        recency_half_life_days=30.0,
+        recency_min_weight=0.05,
+    )
+
+    prepared = prepare_transformer_datasets([source], model_config, training_config)
+
+    assert prepared.train.sampling_weights[0] < prepared.train.sampling_weights[-1]
+    assert prepared.diagnostics["split_policy"]["embargo_bars"] == 4
+    assert prepared.diagnostics["split_policy"]["recency_half_life_days"] == 30.0

@@ -18,6 +18,14 @@ def test_configuration_rejects_invalid_attention_heads() -> None:
         TemporalTransformerConfig(d_model=127, n_heads=8)
 
 
+def test_default_horizon_roles_assign_timing_primary_and_regime() -> None:
+    config = TemporalTransformerConfig()
+
+    assert config.timing_horizon == 5
+    assert config.primary_horizon == 20
+    assert config.regime_horizon == 48
+
+
 def test_model_outputs_all_tasks() -> None:
     config = TemporalTransformerConfig(
         input_features=12,

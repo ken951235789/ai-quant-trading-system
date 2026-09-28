@@ -37,7 +37,8 @@ class TransformerCrossFitConfig:
     minimum_final_holdout_rows: int = 1_000
     rolling_train_rows: int | None = None
     seed_stride: int = 1_000
-    expected_return_horizon: int = 5
+    expected_return_horizon: int = 20
+    embargo_bars: int = 0
     keep_fold_sources: bool = False
 
     def __post_init__(self) -> None:
@@ -64,6 +65,8 @@ class TransformerCrossFitConfig:
             raise ValueError("rolling 模式必須提供不小於 minimum_fit_rows 的 rolling_train_rows")
         if self.expected_return_horizon <= 0:
             raise ValueError("expected_return_horizon 必須大於 0")
+        if self.embargo_bars < 0:
+            raise ValueError("embargo_bars 不可小於 0")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +83,7 @@ class TransformerCrossFitFold:
     oos_start_at: str
     oos_end_at: str
     label_purge_bars: int
+    embargo_bars: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,22 +164,27 @@ def build_transformer_crossfit_plan(
         math.floor(selection_rows * config.initial_train_fraction),
     )
     remaining = selection_rows - initial_fit_rows
-    if remaining < config.folds * config.minimum_oos_rows:
+    usable = remaining - config.folds * config.embargo_bars
+    if usable < config.folds * config.minimum_oos_rows:
         raise ValueError(
             "資料不足以建立 Transformer cross-fit："
             f"選模區 {selection_rows} 列、初始訓練 {initial_fit_rows} 列、"
             f"剩餘 OOS {remaining} 列"
         )
-    block = remaining // config.folds
+    block = usable // config.folds
     folds: list[TransformerCrossFitFold] = []
     for index in range(config.folds):
-        fit_end = initial_fit_rows + block * index
+        fit_end = initial_fit_rows + (block + config.embargo_bars) * index
         fit_start = 0
         if config.mode == "rolling":
             window = int(config.rolling_train_rows or initial_fit_rows)
             fit_start = max(0, fit_end - window)
-        oos_start = fit_end
-        oos_end = selection_rows if index == config.folds - 1 else fit_end + block
+        oos_start = fit_end + config.embargo_bars
+        oos_end = (
+            selection_rows
+            if index == config.folds - 1
+            else oos_start + block
+        )
         if fit_end - fit_start < config.minimum_fit_rows:
             raise ValueError(f"第 {index + 1} fold 訓練列數不足")
         if oos_end - oos_start < config.minimum_oos_rows:
@@ -192,6 +201,7 @@ def build_transformer_crossfit_plan(
                 oos_start_at=ordered.iloc[oos_start]["timestamp"].isoformat(),
                 oos_end_at=ordered.iloc[oos_end - 1]["timestamp"].isoformat(),
                 label_purge_bars=max_horizon_bars,
+                embargo_bars=config.embargo_bars,
             )
         )
     holdout = ordered.iloc[selection_rows:]

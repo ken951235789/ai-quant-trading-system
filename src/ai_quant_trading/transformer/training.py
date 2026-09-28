@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from copy import copy
 from datetime import datetime, timezone
 import json
+import hashlib
 import math
 from pathlib import Path
 import random
@@ -16,7 +18,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from ai_quant_trading.performance import configure_torch_cpu_threads
 
@@ -30,6 +32,7 @@ from ai_quant_trading.transformer.dataset import (
     prepare_transformer_datasets,
 )
 from ai_quant_trading.transformer.model import MarketTemporalTransformer
+from ai_quant_trading.transformer.economics import fixed_hold_evaluation, signal_diagnostics, score_signals
 from ai_quant_trading.transformer.data_contract import build_transformer_feature_contract
 
 
@@ -131,10 +134,24 @@ def _loader(
     device: torch.device,
 ) -> DataLoader:
     worker_count = _worker_count(config.num_workers, config.cpu_threads)
+    sampler = None
+    if shuffle and config.recency_half_life_days is not None:
+        weights = getattr(dataset, "sampling_weights", ())
+        if len(weights) != len(dataset):
+            raise ValueError("Transformer 時間衰減權重數量與訓練樣本不一致")
+        generator = torch.Generator()
+        generator.manual_seed(config.seed)
+        sampler = WeightedRandomSampler(
+            torch.as_tensor(weights, dtype=torch.double),
+            num_samples=len(weights),
+            replacement=True,
+            generator=generator,
+        )
     return DataLoader(
         dataset,
         batch_size=config.batch_size,
-        shuffle=shuffle,
+        shuffle=shuffle and sampler is None,
+        sampler=sampler,
         num_workers=worker_count,
         pin_memory=device.type == "cuda",
         persistent_workers=worker_count > 0,
@@ -151,10 +168,23 @@ def _task_loss(
     side_class_weights: torch.Tensor | None = None,
     tradeability_pos_weights: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
-    return_loss = nn.functional.smooth_l1_loss(
+    weights = config.training_horizon_weights or (1.0,) * len(model_config.return_horizons)
+    if len(weights) != len(model_config.return_horizons):
+        raise ValueError("training_horizon_weights 數量必須等於 return_horizons")
+    horizon_weights = output["future_returns"].new_tensor(weights)
+    horizon_weights = horizon_weights / horizon_weights.sum()
+
+    def horizon_mean(values: torch.Tensor) -> torch.Tensor:
+        # 先平均每個任務的輸出維度，再套用時間視窗權重。
+        while values.ndim > 2:
+            values = values.mean(dim=-1)
+        return (values * horizon_weights).sum(dim=1).mean()
+
+    return_loss = horizon_mean(nn.functional.smooth_l1_loss(
         output["future_returns"],
         batch["future_returns"],
-    )
+        reduction="none",
+    ))
     volatility_loss = nn.functional.smooth_l1_loss(
         output["volatility"],
         batch["volatility"],
@@ -207,7 +237,7 @@ def _task_loss(
                 -1,
                 targets.unsqueeze(-1),
             ).squeeze(-1)
-        combined_weight = focal_weight * sample_weight
+        combined_weight = focal_weight * sample_weight * horizon_weights
         direction_loss = (element_loss * combined_weight).sum() / combined_weight.sum().clamp_min(
             1e-8
         )
@@ -240,7 +270,7 @@ def _task_loss(
                 side_targets.unsqueeze(-1),
             ).squeeze(-1)
         # 多空頭只在扣除成本後具交易價值的樣本上學習，Hold 由獨立頭處理。
-        side_weight = side_weight * batch["tradeability"]
+        side_weight = side_weight * batch["tradeability"] * horizon_weights
         side_loss = (side_element_loss * side_weight).sum() / side_weight.sum().clamp_min(1e-8)
     if "quantile_returns" in output:
         levels = torch.tensor(
@@ -249,26 +279,29 @@ def _task_loss(
             device=output["quantile_returns"].device,
         ).view(1, 1, -1)
         error = batch["future_returns"].unsqueeze(-1) - output["quantile_returns"]
-        quantile_loss = torch.maximum((levels - 1) * error, levels * error).mean()
-        crossing_loss = nn.functional.relu(
+        quantile_loss = horizon_mean(torch.maximum((levels - 1) * error, levels * error))
+        crossing_loss = horizon_mean(nn.functional.relu(
             output["quantile_returns"][..., :-1] - output["quantile_returns"][..., 1:]
-        ).mean()
+        ))
     if "edge_returns" in output and "edge_returns" in batch:
-        edge_loss = nn.functional.smooth_l1_loss(
+        edge_loss = horizon_mean(nn.functional.smooth_l1_loss(
             output["edge_returns"],
             batch["edge_returns"],
-        )
+            reduction="none",
+        ))
     if "excursions" in output and "excursions" in batch:
-        excursion_loss = nn.functional.smooth_l1_loss(
+        excursion_loss = horizon_mean(nn.functional.smooth_l1_loss(
             output["excursions"],
             batch["excursions"],
-        )
+            reduction="none",
+        ))
     if "tradeability_logits" in output and "tradeability" in batch:
-        tradeability_loss = nn.functional.binary_cross_entropy_with_logits(
+        tradeability_loss = horizon_mean(nn.functional.binary_cross_entropy_with_logits(
             output["tradeability_logits"],
             batch["tradeability"],
             pos_weight=tradeability_pos_weights,
-        )
+            reduction="none",
+        ))
     if "volatility_regime_logits" in output and "volatility_regime" in batch:
         volatility_regime_loss = nn.functional.cross_entropy(
             output["volatility_regime_logits"],
@@ -624,13 +657,13 @@ def _checkpoint_horizon_weights(
     horizons: tuple[int, ...],
     configured: tuple[float, ...],
 ) -> np.ndarray:
-    """建立部署導向權重；未指定時讓 5／20／48 根依序負責執行、setup 與趨勢。"""
+    """建立部署導向權重；未指定時讓 5／20／48 根依序負責 timing、交易與 regime。"""
     if configured:
         if len(configured) != len(horizons):
             raise ValueError("checkpoint_horizon_weights 數量必須等於 return_horizons")
         values = np.asarray(configured, dtype=np.float64)
     else:
-        preferred = {5: 0.50, 20: 0.35, 48: 0.15}
+        preferred = {5: 0.15, 20: 0.70, 48: 0.15}
         values = np.asarray(
             [preferred.get(int(horizon), 0.05) for horizon in horizons],
             dtype=np.float64,
@@ -639,6 +672,80 @@ def _checkpoint_horizon_weights(
     if not np.isfinite(total) or total <= 0:
         raise ValueError("checkpoint_horizon_weights 加總必須大於 0")
     return values / total
+
+
+def _selective_edge_metrics(
+    predictions: pd.DataFrame,
+    horizons: tuple[int, ...],
+    coverages: tuple[float, ...],
+    *,
+    net_edge_ranking: bool = False,
+    downside_penalty: float = 0.10,
+) -> dict[str, float]:
+    """評估最高信心訊號的實際成本後優勢，不把空手 K 線當成交易。"""
+    metrics: dict[str, float] = {}
+    for horizon in horizons:
+        required = {
+            f"predicted_long_edge_{horizon}",
+            f"predicted_short_edge_{horizon}",
+            f"actual_long_edge_{horizon}",
+            f"actual_short_edge_{horizon}",
+            f"tradeability_probability_{horizon}",
+            f"side_down_probability_{horizon}",
+            f"side_up_probability_{horizon}",
+        }
+        if not required.issubset(predictions.columns):
+            continue
+        predicted_long = pd.to_numeric(
+            predictions[f"predicted_long_edge_{horizon}"], errors="coerce"
+        ).to_numpy(dtype=np.float64)
+        predicted_short = pd.to_numeric(
+            predictions[f"predicted_short_edge_{horizon}"], errors="coerce"
+        ).to_numpy(dtype=np.float64)
+        actual_long = pd.to_numeric(
+            predictions[f"actual_long_edge_{horizon}"], errors="coerce"
+        ).to_numpy(dtype=np.float64)
+        actual_short = pd.to_numeric(
+            predictions[f"actual_short_edge_{horizon}"], errors="coerce"
+        ).to_numpy(dtype=np.float64)
+        tradeability = pd.to_numeric(
+            predictions[f"tradeability_probability_{horizon}"], errors="coerce"
+        ).to_numpy(dtype=np.float64)
+        side_down = pd.to_numeric(
+            predictions[f"side_down_probability_{horizon}"], errors="coerce"
+        ).to_numpy(dtype=np.float64)
+        side_up = pd.to_numeric(
+            predictions[f"side_up_probability_{horizon}"], errors="coerce"
+        ).to_numpy(dtype=np.float64)
+        choose_long = predicted_long >= predicted_short
+        realized = np.where(choose_long, actual_long, actual_short)
+        side_confidence = np.where(choose_long, side_up, side_down)
+        confidence = tradeability * side_confidence
+        if net_edge_ranking:
+            scores = score_signals(predictions, horizon, downside_penalty)
+            confidence = scores["score"].to_numpy()
+            realized = np.where(scores["long"], actual_long, actual_short)
+        valid = np.isfinite(realized) & np.isfinite(confidence)
+        realized = realized[valid]
+        confidence = confidence[valid]
+        if not len(realized):
+            continue
+        order = np.argsort(-confidence, kind="stable")
+        for coverage in coverages:
+            count = max(1, int(math.ceil(len(order) * coverage)))
+            selected = realized[order[:count]]
+            gains = float(selected[selected > 0].sum())
+            losses = float(-selected[selected < 0].sum())
+            token = int(round(coverage * 100))
+            prefix = f"selective_{horizon}_coverage_{token}"
+            metrics[f"{prefix}_trades"] = float(count)
+            metrics[f"{prefix}_expectancy"] = float(np.mean(selected))
+            metrics[f"{prefix}_win_rate"] = float(np.mean(selected > 0))
+            metrics[f"{prefix}_profit_factor"] = (
+                gains / losses if losses > 1e-12 else (1_000_000.0 if gains > 0 else 0.0)
+            )
+            metrics[f"{prefix}_total_net_edge"] = float(selected.sum())
+    return metrics
 
 
 def _evaluate(
@@ -665,7 +772,19 @@ def _evaluate(
     direction_confusion = np.zeros((horizon_count, 3, 3), dtype=np.int64)
     movement_confusion = np.zeros((horizon_count, 3, 3), dtype=np.int64)
     side_confusion = np.zeros((horizon_count, 2, 2), dtype=np.int64)
-    prediction_rows: list[dict[str, float | int]] = []
+    label_contract = hashlib.sha256(json.dumps({
+        "version": "persisted_direction_v1",
+        "horizons": model.config.return_horizons,
+        "target_mode": config.trading_target_mode,
+        "direction_threshold_bps": config.direction_threshold_bps,
+        "movement_threshold_bps": config.movement_threshold_bps,
+        "movement_atr_multiplier": config.movement_atr_multiplier,
+        "fee_bps_per_side": config.fee_bps_per_side,
+        "slippage_bps_per_side": config.slippage_bps_per_side,
+        "max_observed_spread_bps": config.max_observed_spread_bps,
+        "strategy_event_config": config.strategy_event_config,
+    }, sort_keys=True).encode("utf-8")).hexdigest()
+    prediction_rows: list[dict[str, float | int | str]] = []
     with torch.inference_mode():
         for batch in loader:
             moved = _move_batch(batch, device)
@@ -762,6 +881,14 @@ def _evaluate(
                     if "direction_probability" in output
                     else None
                 )
+                raw_direction_probabilities = (
+                    raw_output["direction_probability"].detach().cpu().numpy()
+                    if "direction_probability" in raw_output else None
+                )
+                raw_tradeability = (
+                    raw_output["tradeability_probability"].detach().cpu().numpy()
+                    if "tradeability_probability" in raw_output else None
+                )
                 movement_probabilities = (
                     output["movement_probability"].detach().cpu().numpy()
                     if "movement_probability" in output
@@ -835,13 +962,21 @@ def _evaluate(
                     else None
                 )
                 for index in range(size):
-                    row: dict[str, float | int] = {
+                    row: dict[str, float | int | str] = {
+                        "series_index": int(batch["series_index"][index]),
+                        "source_key": int(batch["source_key"][index]),
+                        "label_contract": label_contract,
+                        "endpoint": int(batch["endpoint"][index]),
+                        "timestamp_ns": int(batch["timestamp_ns"][index]),
                         "actual_regime": int(regimes[index]),
                         "predicted_regime": int(predicted_regimes[index]),
                         "predicted_volatility": float(predicted_volatility[index, 0]),
                         "actual_volatility": float(actual_volatility[index, 0]),
                         "uncertainty": float(uncertainty[index]),
                     }
+                    for key in batch:
+                        if key.startswith("event_"):
+                            row[key] = float(batch[key][index])
                     if volatility_regime_probability is not None:
                         row["actual_volatility_regime"] = int(actual_volatility_regime[index])
                         for class_index, name in enumerate(("low", "normal", "high")):
@@ -865,7 +1000,14 @@ def _evaluate(
                         row[f"actual_return_{horizon}"] = float(
                             actual_returns[index, horizon_index]
                         )
+                        row[f"actual_direction_{horizon}"] = int(
+                            moved["future_directions"][index, horizon_index].item()
+                        )
                         if direction_probabilities is not None:
+                            for class_index, name in enumerate(("down", "neutral", "up")):
+                                row[f"raw_{name}_probability_{horizon}"] = float(
+                                    raw_direction_probabilities[index, horizon_index, class_index]
+                                )
                             row[f"down_probability_{horizon}"] = float(
                                 direction_probabilities[index, horizon_index, 0]
                             )
@@ -921,6 +1063,9 @@ def _evaluate(
                                     actual_excursions[index, horizon_index, side_index]
                                 )
                         if tradeability_probability is not None:
+                            row[f"raw_tradeability_probability_{horizon}"] = float(
+                                raw_tradeability[index, horizon_index]
+                            )
                             row[f"tradeability_probability_{horizon}"] = float(
                                 tradeability_probability[index, horizon_index]
                             )
@@ -1051,6 +1196,9 @@ def _evaluate(
                 - config.checkpoint_loss_penalty * metrics["loss"]
             )
     if collect_predictions and not prediction_frame.empty:
+        from ai_quant_trading.transformer.evaluation import calibration_diagnostics
+
+        metrics.update(calibration_diagnostics(prediction_frame, model.config.return_horizons))
         predicted_columns = [
             column
             for column in prediction_frame
@@ -1102,7 +1250,74 @@ def _evaluate(
             metrics["tradeability_accuracy"] = float(
                 np.mean((predicted_tradeability >= 0.5) == actual_tradeability_values)
             )
+        if config.trading_target_mode == "strategy_event":
+            from ai_quant_trading.transformer.strategy_events import (
+                StrategyEventConfig, evaluate_event_predictions,
+            )
+
+            metrics.update(evaluate_event_predictions(
+                prediction_frame, int(model.config.primary_horizon),
+                StrategyEventConfig(**config.strategy_event_config),
+                config.economic_minimum_edge_bps,
+            ))
+            metrics["event_sufficient_trades"] = float(
+                metrics["event_filtered_trades"] >= config.economic_minimum_trades
+            )
+            # 未訓練的方向／制度等頭不應被誤讀成事件模型的有效能力。
+            metrics = {key: value for key, value in metrics.items()
+                       if key in {"loss",
+                                  "return_mae", "tradeability_brier", "tradeability_accuracy"}
+                       or key.startswith(("event_", "raw_tradeability_", "calibrated_tradeability_"))}
+            return metrics, prediction_frame
+        metrics.update(
+            _selective_edge_metrics(
+                prediction_frame,
+                model.config.return_horizons,
+                config.selective_coverages,
+                net_edge_ranking=config.trading_target_mode == "terminal_net",
+                downside_penalty=config.economic_downside_penalty,
+            )
+        )
+        if config.trading_target_mode == "terminal_net":
+            economic, _ = fixed_hold_evaluation(
+                prediction_frame, int(model.config.primary_horizon),
+                minimum_edge_bps=config.economic_minimum_edge_bps,
+                downside_penalty=config.economic_downside_penalty,
+                minimum_trades=config.economic_minimum_trades,
+            )
+            metrics.update(economic)
     return metrics, prediction_frame
+
+
+def _split_calibration(data: PreparedTransformerData, config: TransformerTrainingConfig):
+    """驗證區段再按時間切成校準與選模，清除跨界標籤並保留 embargo。"""
+    if config.calibration_fraction == 0:
+        return data.validation, data.validation, {"method": "legacy_shared_validation"}
+    calibration, selection = copy(data.validation), copy(data.validation)
+    cal_refs, val_refs, boundaries = [], [], []
+    horizon = max(data.resolved_model_config.return_horizons) + int(
+        config.trading_target_mode == "strategy_event"
+    )
+    for series_index, series in enumerate(data.validation.series):
+        endpoints = series.validation_endpoints
+        cut = int(len(endpoints) * config.calibration_fraction)
+        if cut <= 0 or cut >= len(endpoints):
+            raise ValueError("校準／選模區段資料不足")
+        boundary = int(endpoints[cut])
+        cal = endpoints[endpoints + horizon < boundary]
+        val = endpoints[endpoints >= boundary + config.embargo_bars]
+        if len(cal) < 8 or len(val) < 8:
+            raise ValueError("校準／選模在 purge 與 embargo 後至少各需要 8 筆資料")
+        cal_refs.extend((series_index, int(point)) for point in cal)
+        val_refs.extend((series_index, int(point)) for point in val)
+        boundaries.append({"series_index": series_index, "calibration_last": int(cal[-1]),
+                           "selection_first": int(val[0]), "purge_bars": horizon,
+                           "embargo_bars": config.embargo_bars})
+    calibration.references, selection.references = tuple(cal_refs), tuple(val_refs)
+    calibration.sampling_weights = tuple(1.0 for _ in cal_refs)
+    selection.sampling_weights = tuple(1.0 for _ in val_refs)
+    return calibration, selection, {"method": "chronological_disjoint_v1", "boundaries": boundaries,
+                                    "calibration_samples": len(cal_refs), "selection_samples": len(val_refs)}
 
 
 def _checkpoint_payload(
@@ -1115,6 +1330,10 @@ def _checkpoint_payload(
 ) -> dict[str, object]:
     return {
         "schema_version": 3,
+        "artifact_kind": (
+            "strategy_event_research_v1" if training_config.trading_target_mode == "strategy_event"
+            else "market_transformer_v3"
+        ),
         "created_at": _utc_now(),
         "epoch": epoch,
         "validation_loss": validation_loss,
@@ -1124,6 +1343,7 @@ def _checkpoint_payload(
         "feature_contract": build_transformer_feature_contract(data.scaler.feature_columns),
         "scaler": data.scaler.to_dict(),
         "sources": [source.to_dict() for source in data.sources],
+        "data_diagnostics": data.diagnostics,
         "state_dict": {key: value.detach().cpu() for key, value in model.state_dict().items()},
     }
 
@@ -1187,9 +1407,16 @@ def train_temporal_transformer(
     model_path = run_dir / "best_model.pt"
     predictions_path = run_dir / "test_predictions.csv"
 
+    if training_config.checkpoint_metric == "economic_selection_score" and (
+        training_config.trading_target_mode != "terminal_net"
+        or training_config.calibration_fraction <= 0
+    ):
+        raise ValueError("經濟選模需要 terminal_net 與獨立校準區段")
+    calibration_data, selection_data, calibration_protocol = _split_calibration(data, training_config)
+    calibration_loader = _loader(calibration_data, training_config, shuffle=False, device=device)
     train_loader = _loader(data.train, training_config, shuffle=True, device=device)
     validation_loader = _loader(
-        data.validation,
+        selection_data,
         training_config,
         shuffle=False,
         device=device,
@@ -1327,11 +1554,20 @@ def train_temporal_transformer(
                         }
                     )
 
+            epoch_calibration = (
+                _fit_probability_calibration(model, calibration_loader, device)
+                if training_config.probability_calibration and training_config.calibration_fraction > 0
+                else {}
+            )
             validation_metrics, _ = _evaluate(
                 model,
                 validation_loader,
                 training_config,
                 device,
+                scaler=data.scaler,
+                horizons=resolved_config.return_horizons,
+                collect_predictions=training_config.checkpoint_metric == "economic_selection_score",
+                calibration=epoch_calibration,
                 direction_class_weights=direction_class_weights,
                 side_class_weights=side_class_weights,
                 tradeability_pos_weights=tradeability_pos_weights,
@@ -1351,7 +1587,7 @@ def train_temporal_transformer(
                     "epoch": epoch_index + 1,
                     "train_loss": train_loss,
                     "validation_loss": validation_loss,
-                    "validation_regime_accuracy": validation_metrics["regime_accuracy"],
+                    "validation_regime_accuracy": validation_metrics.get("regime_accuracy", 0.0),
                     "validation_cost_aware_direction_accuracy": validation_metrics.get(
                         "cost_aware_direction_accuracy",
                         0.0,
@@ -1393,9 +1629,16 @@ def train_temporal_transformer(
                         0.0,
                     ),
                     "checkpoint_value": checkpoint_value,
+                    "validation_fixed_hold_expectancy": validation_metrics.get("fixed_hold_expectancy", 0.0),
+                    "validation_fixed_hold_trades": validation_metrics.get("fixed_hold_trades", 0.0),
+                    "validation_fixed_hold_ci_low": validation_metrics.get("fixed_hold_expectancy_ci_low", 0.0),
                     "learning_rate": optimizer.param_groups[0]["lr"],
                 }
             )
+            if training_config.trading_target_mode == "strategy_event":
+                history[-1] = {key: value for key, value in history[-1].items()
+                               if key in {"epoch", "train_loss", "validation_loss",
+                                          "checkpoint_value", "learning_rate"}}
             pd.DataFrame(history).to_csv(history_csv, index=False, encoding="utf-8")
             improved = (
                 checkpoint_value > best_checkpoint_value
@@ -1443,7 +1686,7 @@ def train_temporal_transformer(
                         "metrics": {
                             "train_loss": train_loss,
                             "validation_loss": validation_loss,
-                            "validation_regime_accuracy": validation_metrics["regime_accuracy"],
+                            "validation_regime_accuracy": validation_metrics.get("regime_accuracy", 0.0),
                             "validation_cost_aware_direction_accuracy": (
                                 validation_metrics.get(
                                     "cost_aware_direction_accuracy",
@@ -1474,15 +1717,25 @@ def train_temporal_transformer(
         model.load_state_dict(checkpoint["state_dict"])
         calibration: dict[str, float | str] = {}
         if training_config.probability_calibration:
-            calibration = _fit_probability_calibration(
-                model,
-                validation_loader,
-                device,
-            )
+            calibration = _fit_probability_calibration(model, calibration_loader, device)
             checkpoint["calibration"] = calibration
             temporary_model = model_path.with_suffix(".tmp")
             torch.save(checkpoint, temporary_model)
             temporary_model.replace(model_path)
+        # 選模與測試套用同一份校準器，校準器僅從更早的校準區段擬合。
+        validation_selection_metrics, validation_predictions = _evaluate(
+            model,
+            validation_loader,
+            training_config,
+            device,
+            scaler=data.scaler,
+            horizons=resolved_config.return_horizons,
+            collect_predictions=True,
+            calibration=calibration,
+            direction_class_weights=direction_class_weights,
+            side_class_weights=side_class_weights,
+            tradeability_pos_weights=tradeability_pos_weights,
+        )
         test_metrics, predictions = _evaluate(
             model,
             test_loader,
@@ -1497,6 +1750,27 @@ def train_temporal_transformer(
             tradeability_pos_weights=tradeability_pos_weights,
         )
         predictions.to_csv(predictions_path, index=False, encoding="utf-8")
+        validation_predictions.to_csv(run_dir / "validation_predictions.csv", index=False)
+        economic_artifacts: dict[str, object] = {}
+        if training_config.trading_target_mode == "terminal_net":
+            for split, frame in (("validation", validation_predictions), ("test", predictions)):
+                diagnostics = signal_diagnostics(frame, int(resolved_config.primary_horizon), training_config.economic_downside_penalty)
+                diagnostics.to_csv(run_dir / f"{split}_signal_diagnostics.csv", index=False)
+                base_metrics, trades = fixed_hold_evaluation(
+                    frame, int(resolved_config.primary_horizon),
+                    minimum_edge_bps=training_config.economic_minimum_edge_bps,
+                    downside_penalty=training_config.economic_downside_penalty,
+                    minimum_trades=training_config.economic_minimum_trades,
+                )
+                trades.to_csv(run_dir / f"{split}_fixed_hold_trades.csv", index=False)
+                stress, _ = fixed_hold_evaluation(
+                    frame, int(resolved_config.primary_horizon),
+                    minimum_edge_bps=training_config.economic_minimum_edge_bps,
+                    downside_penalty=training_config.economic_downside_penalty,
+                    minimum_trades=training_config.economic_minimum_trades,
+                    extra_cost_bps=training_config.fee_bps_per_side + training_config.slippage_bps_per_side,
+                )
+                economic_artifacts[split] = {"base": base_metrics, "extra_one_way_cost": stress}
         duration = monotonic() - started
         summary = {
             "schema_version": 3,
@@ -1510,14 +1784,19 @@ def train_temporal_transformer(
             "checkpoint_metric": training_config.checkpoint_metric,
             "best_checkpoint_value": best_checkpoint_value,
             "training_class_balance": class_balance,
+            "validation_selection_metrics": validation_selection_metrics,
             "test_metrics": test_metrics,
             "sample_counts": data.sample_counts,
+            "data_diagnostics": data.diagnostics,
             "model_config": resolved_config.to_dict(),
             "training_config": training_config.to_dict(),
             "trainable_parameters": model.trainable_parameters,
             "feature_columns": list(data.scaler.feature_columns),
             "scaler": data.scaler.to_dict(),
             "calibration": calibration,
+            "calibration_protocol": calibration_protocol,
+            "economic_evaluation": economic_artifacts,
+            "economic_evaluation_scope": "固定 1x、下一開盤進場、指定期限收盤退出、不重疊；含設定費用與 funding 估計。回撤為平倉權益，非 SAC 實盤認證。",
             "sources": [source.to_dict() for source in data.sources],
             "artifacts": {
                 "model": model_path.name,
@@ -1525,6 +1804,17 @@ def train_temporal_transformer(
                 "test_predictions": predictions_path.name,
             },
         }
+        if training_config.trading_target_mode == "strategy_event":
+            summary["artifact_kind"] = "strategy_event_research_v1"
+            summary["live_eligible"] = False
+            summary["training_class_balance"] = {
+                key: value for key, value in class_balance.items() if key.startswith("tradeability")
+            }
+            summary["economic_evaluation_scope"] = (
+                "15m 固定突破候選、下一開盤、ATR 保護單、最長持有及制度退出；"
+                "相同成交標籤作 AI 過濾比較，不是投資組合回測。"
+                "Funding 為雙向準備金假設，稅務未驗證；未訓練的輔助輸出不得用於交易。"
+            )
         _json_dump(summary_json, summary)
         from ai_quant_trading.operations.integrity import build_artifact_manifest
 
@@ -1546,13 +1836,13 @@ def train_temporal_transformer(
                         "train_loss": float(history[-1]["train_loss"]),
                         "validation_loss": best_validation,
                         "validation_regime_accuracy": float(
-                            history[-1]["validation_regime_accuracy"]
+                            history[-1].get("validation_regime_accuracy", 0.0)
                         ),
                         "validation_cost_aware_direction_accuracy": float(
-                            history[-1]["validation_cost_aware_direction_accuracy"]
+                            history[-1].get("validation_cost_aware_direction_accuracy", 0.0)
                         ),
                         "test_loss": test_metrics["loss"],
-                        "test_regime_accuracy": test_metrics["regime_accuracy"],
+                        "test_regime_accuracy": test_metrics.get("regime_accuracy", 0.0),
                         "direction_accuracy": test_metrics.get(
                             "direction_accuracy",
                             0.0,

@@ -3,9 +3,9 @@
 ## 精簡短線輸入
 
 新 BTC 環境預設最多 112 欄，本機五週期資料為 107 欄，排除重複的基礎 15m 指標與整批 latent。
-保留 1／5／20 根角色訊號、九個市場情境與訊號熵。風控的 `expected_return` 另由
-`environment.json → ai_context.expected_return_contract` 明確指定，新短線預設 5 根。
-舊模型無契約時只維持既有 20 根執行語意；新版不得猜測來源，輸入變動必須重建環境與重訓。
+保留 5／20／48 根角色訊號、九個市場情境與訊號熵。風控的 `expected_return` 另由
+`environment.json → ai_context.expected_return_contract` 明確指定，新短線預設 20 根。
+舊模型無契約時只維持既有執行語意；新版不得猜測來源，輸入變動必須重建環境與重訓。
 詳見 `docs/compact_ai_inputs_20260915.md`。
 
 此模組只服務 `BTC/USDT` Binance USD-M 永續合約研究。SAC 是主要連續部位模型，
@@ -30,7 +30,7 @@ Episode 可隨機起點、初始本金及滑價，但驗證與測試會自動關
 ## Observation
 
 - 經 train-only mean/std 標準化的市場與 Transformer 特徵。
-- Transformer 的 20 根趨勢、5 根 setup、1 根執行訊號，以及跨週期共識、分歧、信心、
+- Transformer 的 48 根 regime、20 根主要交易訊號、5 根進場 timing，以及跨週期共識、分歧、信心、
   不交易壓力與扣除成本後的多空淨優勢。
 - 可用餘額、方向曝險、淨值、回撤、已實現與未實現損益。
 - 平均進場價距離、持倉 K 線數、今日損益與連虧次數。
