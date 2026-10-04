@@ -41,8 +41,11 @@ Episode 可隨機起點、初始本金及滑價，但驗證與測試會自動關
 
 ## Action 與固定風控
 
-- 新 SAC 使用 `hold_close_target`：動作絕對值 `0～0.03` 為等待／續抱、`0.03～0.10`
-  為主動平倉，超過 `0.10` 才提出多空目標。舊 checkpoint 保留 `legacy_target` 行為。
+- 目前 `experts.py` 的新短線 profile 使用 `continuous_target`，以連續目標部位搭配
+  再平衡 deadband；真正執行方式以保存的 `environment.json` 為準，不由檔名猜測。
+- 已保存的 `hold_close_target` 模型維持動作絕對值 `0～0.03` 等待／續抱、
+  `0.03～0.10` 主動平倉、超過 `0.10` 提出多空目標；`legacy_target` 亦保留自己的契約。
+  不得只更改舊 checkpoint 的語意或欄位後直接使用，需重建環境與重訓。
 - 反向交易分兩次決策，先平倉，下一根仍維持反向才開倉。
 - 預設逐倉 2 倍、最高 3 倍，保證金最多 20%，名目曝險最多 50%。
 - 動態槓桿只接受「指定停利先於停損」的樣本外校準成功率；偏多／偏空 regime 機率不能
@@ -88,6 +91,10 @@ Walk-forward fold 串行訓練。seed、參數與候選模型只能根據選模 
 通過後才會開啟 final holdout 評估一次，並保存模型、資料與評估 CSV 的 SHA-256。
 Champion 升級會重新驗證完整證據鏈及模擬倉紀錄；舊研究缺少 protocol v2 證據時只能
 離線查看，不能升級。正式研究至少使用 5 個 seed；smoke training 只證明管線可執行。
+
+獨立的 [分階段固定事件研究](../../../docs/STAGED_TRAINING_20260930.md) 使用
+`entry_allocation_only_0_to_1`，先固定多空訊號與出場，只比較資金配置。
+它與上述完整交易環境不相容，也不能因研究通過就載入 Paper 或 Live。
 
 SB3 `zip` 含 Python 序列化內容，所有載入入口都要求訓練時建立的
 `artifact_manifest.json`。不要匯入來源不可信的模型，也不要為了載入舊模型手動偽造清單。

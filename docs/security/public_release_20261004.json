@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "SECURITY_REVIEW-20261004-152237F6",
+  "report_type": "security_review",
+  "generated_at_utc": "2026-10-04T10:17:08Z",
+  "project": {
+    "name": "AIQuantTradingSystem-Public",
+    "revision": "611b040 + publication snapshot 20261004",
+    "environment": "Windows; Python 3.13; CPU numerical threads=2"
+  },
+  "scope": "Public Git index, reachable history and sanitized research summaries",
+  "overall_status": "WARN",
+  "summary": "公開程式與彙總完成限定安全檢查；沒有發現可辨識秘密，仍有靜態安全提醒，不構成零漏洞或實盤認證。",
+  "changes": ["同步候選契約、策略/特徵研究、Kaggle工具與測試", "排除私人產物，移除個人資金、稅務身分與私人雲端連結", "研究JSON只保留允許的彙總欄位，保留公開版既有安全修正"],
+  "findings": [
+    {"id": "SEC-001", "severity": "MEDIUM", "status": "OPEN", "category": "靜態檢查", "component": "Kaggle runners / research reporting", "title": "固定暫存目錄與可信XML邊界提醒", "evidence": ["Bandit: 9 B108 medium; 3 B314 medium; 0 high"], "impact": "不受信任共享主機或外部XML存在額外輸入風險。", "recommendation": "使用隔離環境及自己產生的測試報告；後續加強暫存隔離與XML解析。"},
+    {"id": "SEC-002", "severity": "LOW", "status": "RESOLVED", "category": "隱私", "component": "研究文件", "title": "去除個人化研究背景", "evidence": ["發布前移除個人本金與稅務身分，不含私人Notebook連結"], "impact": "避免將非必要個人資訊隨研究結果公開。", "recommendation": "後續發布維持白名單彙總及人工差異檢查。"}
+  ],
+  "checks": [
+    {"id": "CHECK-001", "name": "完整測試", "status": "PASS", "evidence": ["696 passed, 4 subtests passed"], "duration_seconds": 143.03},
+    {"id": "CHECK-002", "name": "靜態品質與離線Demo", "status": "PASS", "evidence": ["Ruff; compileall; git diff --cached --check", "360 synthetic bars, 155 decisions; HTML/JSON generated"]},
+    {"id": "CHECK-003", "name": "秘密與公開邊界掃描", "status": "PASS", "evidence": ["Gitleaks 8.30.1 redact: staged export and 13 pre-publication reachable commits, no leaks", "check_public_repository.py --staged: no findings"]},
+    {"id": "CHECK-004", "name": "研究JSON與成品", "status": "PASS", "evidence": ["Project report schema validation", "18 models, 508 manifest files, 216 reference probes; cost/label reconciliation"]},
+    {"id": "CHECK-005", "name": "Bandit", "status": "WARN", "evidence": ["0 high; 12 medium; 94 low"]},
+    {"id": "CHECK-006", "name": "依賴漏洞資料更新", "status": "NOT_APPLICABLE", "evidence": ["未變更依賴，本輪未重新查詢漏洞資料庫；舊結果不視為今日保證"]}
+  ],
+  "metrics": {"tests_passed": 696, "subtests_passed": 4, "bandit_high": 0, "bandit_medium": 12, "bandit_low": 94, "research_models": 18, "live_eligible": false},
+  "artifacts": [{"path": "docs/SECURITY_AUDIT_20261004.md", "role": "發布範圍與限制"}, {"path": "docs/research/candidate_features_20261004.json", "role": "去識別研究彙總"}],
+  "residual_risks": ["沒有滲透測試或真實下單", "沒有重寫舊公開歷史或清除外部fork/快取", "固定暫存與XML提醒仍存在", "本次沒有重跑依賴漏洞資料查詢", "公開版不含資料/權重，不能取代私人備份"],
+  "next_actions": ["正常提交推送並核对遠端HEAD及CI", "後續改善暫存隔離與XML輸入邊界", "不以工程PASS替代策略品質或實盤資格"]
+}

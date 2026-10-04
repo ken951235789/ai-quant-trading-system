@@ -135,7 +135,7 @@ def _loader(
 ) -> DataLoader:
     worker_count = _worker_count(config.num_workers, config.cpu_threads)
     sampler = None
-    if shuffle and config.recency_half_life_days is not None:
+    if shuffle and (config.recency_half_life_days is not None or config.candidate_contract is not None):
         weights = getattr(dataset, "sampling_weights", ())
         if len(weights) != len(dataset):
             raise ValueError("Transformer 時間衰減權重數量與訓練樣本不一致")
@@ -180,7 +180,9 @@ def _task_loss(
             values = values.mean(dim=-1)
         return (values * horizon_weights).sum(dim=1).mean()
 
-    return_loss = horizon_mean(nn.functional.smooth_l1_loss(
+    # 平均收益與穩健中心不是同一目標；舊設定保持原行為，新研究可明選 MSE。
+    return_loss_function = nn.functional.mse_loss if config.return_loss_kind == "mse" else nn.functional.smooth_l1_loss
+    return_loss = horizon_mean(return_loss_function(
         output["future_returns"],
         batch["future_returns"],
         reduction="none",
@@ -761,6 +763,7 @@ def _evaluate(
     direction_class_weights: torch.Tensor | None = None,
     side_class_weights: torch.Tensor | None = None,
     tradeability_pos_weights: torch.Tensor | None = None,
+    event_reference: dict[str, float] | None = None,
 ) -> tuple[dict[str, float], pd.DataFrame]:
     model.eval()
     total_loss = 0.0
@@ -783,6 +786,7 @@ def _evaluate(
         "slippage_bps_per_side": config.slippage_bps_per_side,
         "max_observed_spread_bps": config.max_observed_spread_bps,
         "strategy_event_config": config.strategy_event_config,
+        **({"candidate_contract": config.candidate_contract} if config.candidate_contract is not None else {}),
     }, sort_keys=True).encode("utf-8")).hexdigest()
     prediction_rows: list[dict[str, float | int | str]] = []
     with torch.inference_mode():
@@ -1263,11 +1267,21 @@ def _evaluate(
             metrics["event_sufficient_trades"] = float(
                 metrics["event_filtered_trades"] >= config.economic_minimum_trades
             )
+            if event_reference is not None:
+                from ai_quant_trading.transformer.event_diagnostics import prediction_skill
+
+                metrics.update(prediction_skill(prediction_frame, int(model.config.primary_horizon), event_reference))
             # 未訓練的方向／制度等頭不應被誤讀成事件模型的有效能力。
             metrics = {key: value for key, value in metrics.items()
                        if key in {"loss",
                                   "return_mae", "tradeability_brier", "tradeability_accuracy"}
                        or key.startswith(("event_", "raw_tradeability_", "calibrated_tradeability_"))}
+            # 不保存未訓練方向／風險頭，避免看似有效的亂數輸出被拿去餵 SAC。
+            prediction_frame = prediction_frame[[column for column in prediction_frame
+                if column in {"series_index", "source_key", "label_contract", "endpoint", "timestamp_ns"}
+                or column.startswith(("event_", "predicted_return_", "actual_return_",
+                                      "raw_tradeability_probability_", "tradeability_probability_",
+                                      "actual_tradeability_"))]]
             return metrics, prediction_frame
         metrics.update(
             _selective_edge_metrics(
@@ -1295,7 +1309,7 @@ def _split_calibration(data: PreparedTransformerData, config: TransformerTrainin
         return data.validation, data.validation, {"method": "legacy_shared_validation"}
     calibration, selection = copy(data.validation), copy(data.validation)
     cal_refs, val_refs, boundaries = [], [], []
-    horizon = max(data.resolved_model_config.return_horizons) + int(
+    horizon = max(data.resolved_model_config.return_horizons) + int(config.candidate_contract is not None) + int(
         config.trading_target_mode == "strategy_event"
     )
     for series_index, series in enumerate(data.validation.series):
@@ -1393,6 +1407,12 @@ def train_temporal_transformer(
         dtype=torch.float32,
         device=device,
     )
+    event_reference = None
+    if training_config.trading_target_mode == "strategy_event":
+        from ai_quant_trading.transformer.event_diagnostics import training_reference
+
+        event_reference = training_reference(data.scaler.return_means[0],
+            class_balance["tradeability_positive"][0], class_balance["tradeability_total"][0])
     safe_name = (
         "".join(
             character if character.isalnum() or character in {"-", "_"} else "_"
@@ -1566,11 +1586,13 @@ def train_temporal_transformer(
                 device,
                 scaler=data.scaler,
                 horizons=resolved_config.return_horizons,
-                collect_predictions=training_config.checkpoint_metric == "economic_selection_score",
+                collect_predictions=(training_config.checkpoint_metric == "economic_selection_score"
+                                     or training_config.trading_target_mode == "strategy_event"),
                 calibration=epoch_calibration,
                 direction_class_weights=direction_class_weights,
                 side_class_weights=side_class_weights,
                 tradeability_pos_weights=tradeability_pos_weights,
+                event_reference=event_reference,
             )
             train_loss = epoch_loss / epoch_items
             validation_loss = float(validation_metrics["loss"])
@@ -1639,6 +1661,8 @@ def train_temporal_transformer(
                 history[-1] = {key: value for key, value in history[-1].items()
                                if key in {"epoch", "train_loss", "validation_loss",
                                           "checkpoint_value", "learning_rate"}}
+                history[-1].update({f"validation_{key}": value for key, value in validation_metrics.items()
+                                   if key.startswith("event_")})
             pd.DataFrame(history).to_csv(history_csv, index=False, encoding="utf-8")
             improved = (
                 checkpoint_value > best_checkpoint_value
@@ -1735,6 +1759,7 @@ def train_temporal_transformer(
             direction_class_weights=direction_class_weights,
             side_class_weights=side_class_weights,
             tradeability_pos_weights=tradeability_pos_weights,
+            event_reference=event_reference,
         )
         test_metrics, predictions = _evaluate(
             model,
@@ -1748,10 +1773,25 @@ def train_temporal_transformer(
             direction_class_weights=direction_class_weights,
             side_class_weights=side_class_weights,
             tradeability_pos_weights=tradeability_pos_weights,
+            event_reference=event_reference,
         )
         predictions.to_csv(predictions_path, index=False, encoding="utf-8")
         validation_predictions.to_csv(run_dir / "validation_predictions.csv", index=False)
         economic_artifacts: dict[str, object] = {}
+        event_diagnostics: dict[str, object] = {}
+        if training_config.trading_target_mode == "strategy_event":
+            from ai_quant_trading.transformer.event_diagnostics import diagnose_events
+            from ai_quant_trading.transformer.strategy_events import StrategyEventConfig
+
+            for split, frame in (("validation", validation_predictions), ("test", predictions)):
+                diagnostics = diagnose_events(frame, int(resolved_config.primary_horizon),
+                    StrategyEventConfig(**training_config.strategy_event_config),
+                    training_config.economic_minimum_edge_bps, event_reference,
+                    slippage_bps_per_side=training_config.slippage_bps_per_side,
+                    minimum_trades=training_config.economic_minimum_trades)
+                name = f"{split}_event_diagnostics.json"
+                _json_dump(run_dir / name, diagnostics)
+                event_diagnostics[split] = {"path": name, "research_gate": diagnostics["research_gate"]}
         if training_config.trading_target_mode == "terminal_net":
             for split, frame in (("validation", validation_predictions), ("test", predictions)):
                 diagnostics = signal_diagnostics(frame, int(resolved_config.primary_horizon), training_config.economic_downside_penalty)
@@ -1806,6 +1846,8 @@ def train_temporal_transformer(
         }
         if training_config.trading_target_mode == "strategy_event":
             summary["artifact_kind"] = "strategy_event_research_v1"
+            summary["event_reference"] = event_reference
+            summary["event_diagnostics"] = event_diagnostics
             summary["live_eligible"] = False
             summary["training_class_balance"] = {
                 key: value for key, value in class_balance.items() if key.startswith("tradeability")

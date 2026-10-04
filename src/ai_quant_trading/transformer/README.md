@@ -128,3 +128,38 @@ data/processed/transformer/models/<訓練時間_名稱>/
 所有輸出都必須帶有 `transformer_available`。只有值為 `1` 時，PPO 才能把它視為有效模型訊號。
 訓練完成本身不會自動改動既有 PPO；還需要執行 Transformer 推論建立市場特徵，
 重新建立強化學習環境並重新訓練 PPO。
+
+## 固定策略事件研究設定
+
+`transformer_strategy_event_v2.example.json` 是獨立的研究設定，仍採 Transformer V3，
+不沿用上方一般方向模型的多頭輸出語意。只訓練固定策略的淨收益、分位數與成功機率，
+新增 20 個因果情境特徵，以 Train 常數基準評估 Selection 的收益與機率品質。
+舊指令預設保持原事件設定；啟用新版必須明確指定 `--config`。
+此模型禁止直接接入既有 SAC、Paper 或 Live，必須重新驗證 OOS 介面及交易品質。
+
+操作、實驗限制與最新結果見 [事件研究分析與優化](../../../docs/TRANSFORMER_EVENT_OPTIMIZATION_20260929.md)。
+
+## 配對消融與向前驗證
+
+`scripts/run_strategy_event_study.py` 以四組「舊／新情境特徵 × Smooth L1／MSE」
+配對種子訓練，再以 Selection 選擇一個研究挑戰組，與基準組執行三段 expanding
+walk-forward。所有進出場、成本與門檻固定，計畫在訓練前保存；每次完成均保存
+checkpoint、預測及診斷。程序不會自動更換交易模型。
+
+`scripts/audit_strategy_event_study.py` 驗證成品雜湊、程式版本、相同窗口的配對標籤與
+Train 參考分布，以及校準、Selection、Test 的時間邊界。
+詳見 [實驗方法與操作](../../../docs/EVENT_ABLATION_WALKFORWARD_20260929.md)。
+
+## 共用候選契約研究
+
+新的 `candidate_contract` 設定只供事件研究，明確綁定策略、成本與特徵版本。
+未指定時保留舊行為；指定時使用複合策略共用成交引擎及 Train-only 重疊事件權重。
+新入口每個模型只訓練一種固定策略，不把不同持倉條件混成同一個 target。
+已有成功機率、淨收益與分位數頭繼續使用，沒有新增未訓練輸出，也不解鎖部署。
+見 [完整設定與驗證方法](../../../docs/CANDIDATE_TRAINING_CONTRACT_20261003.md)。
+## 候選特徵五組比較
+
+研究 CLI 新增 `--feature-study`，比較既有、精簡、成交資訊、交易空間及合併版本。
+模型主體、交易門檻和候選標籤不變；`--flow-source` 只在逐根 OHLCV 一致後補入成交欄位。
+`--smoke` 僅工程測試，不能直接部署或解除 SAC 品質閘門。
+操作見 [候選特徵研究](../../../docs/CANDIDATE_FEATURE_STUDY_20261003.md)。

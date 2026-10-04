@@ -213,6 +213,11 @@ python scripts\build_windows_exe.py
 
 ## 成本後與策略事件研究
 
+最新候選研究使用 `run_candidate_training_research.py`：預設只列計畫，`--smoke` 才執行
+小型 CPU 流程，`--run-research` 是明確長時間研究入口。`--feature-study` 支援事前固定
+的特徵消融，`--variants` 與 `--folds` 可限制矩陣。使用方式與已完成結果见
+[2026-10-04 配對研究](../docs/KAGGLE_CANDIDATE_FEATURES_20261004.md)。
+
 - `run_transformer_strategy_event.py`：固定規則、候選診斷與 V3 事件訓練。
 - `build_kaggle_strategy_event.py`：白名單建立私人 Kaggle 研究包；不自動提交。
 - `kaggle_strategy_event_runner.py`：校驗快照，支援 ZIP／已解壓輸入，保存進度與结果。

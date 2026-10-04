@@ -1,0 +1,537 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "MODEL_RESEARCH-20261004-4A33C5CB",
+  "report_type": "model_research",
+  "generated_at_utc": "2026-10-04T10:14:46Z",
+  "project": {
+    "name": "AIQuantTradingSystem-Public",
+    "revision": "611b040 + candidate feature publication snapshot",
+    "environment": "Kaggle Tesla T4; small Transformer V3; three seeds"
+  },
+  "scope": "18 paired candidate models; one reused research window; aggregate results only",
+  "overall_status": "WARN",
+  "summary": "18組工程完成；預測改善不一致，AI全部零成交，研究證據不足，不解鎖SAC或實盤。",
+  "changes": [
+    "共用候選契約與成本帳務",
+    "精簡加成交/交易空間特徵配對研究",
+    "公開彙總及重現指令，不公開原始資料、模型與逐筆交易"
+  ],
+  "findings": [
+    {
+      "id": "MODEL-001",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "category": "研究品質",
+      "component": "Transformer候選篩選",
+      "title": "尚未證明可交易的成本後優勢",
+      "evidence": [
+        "18個Transformer基本成本回放皆為零成交",
+        "VWAP無AI基本成本略正，壓力成本轉負"
+      ],
+      "impact": "不能估計模型成交期望值或授予實盤資格。",
+      "recommendation": "預登記分群消融與跨期檢查；不依已看過的Test降低門檻。"
+    }
+  ],
+  "checks": [
+    {
+      "id": "CHECK-001",
+      "name": "雲端執行",
+      "status": "PASS",
+      "evidence": [
+        "18/18 models; 0 failures; Tesla T4"
+      ],
+      "duration_seconds": 1121.960607545
+    },
+    {
+      "id": "CHECK-002",
+      "name": "下載成品與帳務稽核",
+      "status": "PASS",
+      "evidence": [
+        "508 manifest files; 18 models; 11646 prediction rows; 16656 scenario/policy trade rows; 216 reference probes"
+      ]
+    },
+    {
+      "id": "CHECK-003",
+      "name": "研究與部署",
+      "status": "BLOCKED",
+      "evidence": [
+        "research_quality=INSUFFICIENT_EVIDENCE; p2_sac=BLOCKED; live_eligible=false"
+      ]
+    }
+  ],
+  "metrics": {
+    "engineering": "PASS",
+    "research_quality": "INSUFFICIENT_EVIDENCE",
+    "live_eligible": false,
+    "p2_sac": "BLOCKED",
+    "models": 18,
+    "seeds": [
+      42,
+      137,
+      2026
+    ],
+    "folds": [
+      3
+    ],
+    "duration_seconds": 1121.960607545,
+    "source_bars": 176729,
+    "source_sha256": "642cf314ea775dfdc5fdaa0400cd30bbfa2ec1e484b59cd70595be1e9b8d5cde",
+    "private_study_sha256": "95de57b323e81537568229277f405e8df7c1bd7f0d3bf175bf31d57588671393",
+    "per_seed": [
+      {
+        "family": "original",
+        "variant": "F_existing",
+        "seed": 42,
+        "fold": 3,
+        "feature_count": 73,
+        "return_skill": -0.038178873264133495,
+        "probability_skill": -0.01116578752758346,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "original",
+        "variant": "F_existing",
+        "seed": 137,
+        "fold": 3,
+        "feature_count": 73,
+        "return_skill": -0.024096540210965856,
+        "probability_skill": 0.0034433512090166207,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "original",
+        "variant": "F_existing",
+        "seed": 2026,
+        "fold": 3,
+        "feature_count": 73,
+        "return_skill": 0.018658840563885448,
+        "probability_skill": 0.013491086329250335,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "original",
+        "variant": "F_compact_combined",
+        "seed": 42,
+        "fold": 3,
+        "feature_count": 60,
+        "return_skill": -0.05965713385522342,
+        "probability_skill": -0.016637597190021225,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "original",
+        "variant": "F_compact_combined",
+        "seed": 137,
+        "fold": 3,
+        "feature_count": 60,
+        "return_skill": -0.018042295486862203,
+        "probability_skill": 0.002639339187018641,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "original",
+        "variant": "F_compact_combined",
+        "seed": 2026,
+        "fold": 3,
+        "feature_count": 60,
+        "return_skill": -0.013071744619598924,
+        "probability_skill": 0.0063364289661980155,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "trend_pullback",
+        "variant": "F_existing",
+        "seed": 42,
+        "fold": 3,
+        "feature_count": 73,
+        "return_skill": -0.008686981083569245,
+        "probability_skill": 0.0002288362116751319,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "trend_pullback",
+        "variant": "F_existing",
+        "seed": 137,
+        "fold": 3,
+        "feature_count": 73,
+        "return_skill": 0.0037794547327814065,
+        "probability_skill": 0.006727482925181438,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "trend_pullback",
+        "variant": "F_existing",
+        "seed": 2026,
+        "fold": 3,
+        "feature_count": 73,
+        "return_skill": -0.018991333307869285,
+        "probability_skill": 0.0011929827222060263,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "trend_pullback",
+        "variant": "F_compact_combined",
+        "seed": 42,
+        "fold": 3,
+        "feature_count": 60,
+        "return_skill": 0.0015039885755148141,
+        "probability_skill": 0.00979039502672685,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "trend_pullback",
+        "variant": "F_compact_combined",
+        "seed": 137,
+        "fold": 3,
+        "feature_count": 60,
+        "return_skill": -0.003769864182307625,
+        "probability_skill": 0.005199420109960773,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "trend_pullback",
+        "variant": "F_compact_combined",
+        "seed": 2026,
+        "fold": 3,
+        "feature_count": 60,
+        "return_skill": -0.008052027440007548,
+        "probability_skill": 0.009227620388166713,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "vwap_reversion",
+        "variant": "F_existing",
+        "seed": 42,
+        "fold": 3,
+        "feature_count": 73,
+        "return_skill": 0.0390317422285944,
+        "probability_skill": -0.06660164482005637,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "vwap_reversion",
+        "variant": "F_existing",
+        "seed": 137,
+        "fold": 3,
+        "feature_count": 73,
+        "return_skill": 0.027756306874759717,
+        "probability_skill": -0.051389268357510565,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "vwap_reversion",
+        "variant": "F_existing",
+        "seed": 2026,
+        "fold": 3,
+        "feature_count": 73,
+        "return_skill": 0.05999448162866261,
+        "probability_skill": -0.06543255322905073,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "vwap_reversion",
+        "variant": "F_compact_combined",
+        "seed": 42,
+        "fold": 3,
+        "feature_count": 60,
+        "return_skill": 0.02681538092590774,
+        "probability_skill": -0.0364776641793052,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "vwap_reversion",
+        "variant": "F_compact_combined",
+        "seed": 137,
+        "fold": 3,
+        "feature_count": 60,
+        "return_skill": 0.0272631511737077,
+        "probability_skill": -0.038442451406072164,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      },
+      {
+        "family": "vwap_reversion",
+        "variant": "F_compact_combined",
+        "seed": 2026,
+        "fold": 3,
+        "feature_count": 60,
+        "return_skill": 0.019281231662564347,
+        "probability_skill": -0.048553793924038136,
+        "ai_trades": 0,
+        "ai_mean_net_return": null
+      }
+    ],
+    "grouped_prediction_scores": [
+      {
+        "family": "original",
+        "variant": "F_existing",
+        "scores": {
+          "event_return_skill": {
+            "mean": -0.0145388576370713,
+            "std_population": 0.02416806985034096,
+            "worst": -0.038178873264133495
+          },
+          "event_probability_skill": {
+            "mean": 0.0019228833368944986,
+            "std_population": 0.010123379673164824,
+            "worst": -0.01116578752758346
+          },
+          "event_prediction_skill_score": {
+            "mean": -0.006307987150088401,
+            "std_population": 0.016875966987616977,
+            "worst": -0.024672330395858477
+          }
+        }
+      },
+      {
+        "family": "original",
+        "variant": "F_compact_combined",
+        "scores": {
+          "event_return_skill": {
+            "mean": -0.03025705798722818,
+            "std_population": 0.02088779451839311,
+            "worst": -0.05965713385522342
+          },
+          "event_probability_skill": {
+            "mean": -0.0025539430122681894,
+            "std_population": 0.010072374908885972,
+            "worst": -0.016637597190021225
+          },
+          "event_prediction_skill_score": {
+            "mean": -0.016405500499748187,
+            "std_population": 0.015475292579962205,
+            "worst": -0.03814736552262232
+          }
+        }
+      },
+      {
+        "family": "trend_pullback",
+        "variant": "F_existing",
+        "scores": {
+          "event_return_skill": {
+            "mean": -0.007966286552885707,
+            "std_population": 0.00931009299820999,
+            "worst": -0.018991333307869285
+          },
+          "event_probability_skill": {
+            "mean": 0.0027164339530208657,
+            "std_population": 0.0028634221968645624,
+            "worst": 0.0002288362116751319
+          },
+          "event_prediction_skill_score": {
+            "mean": -0.002624926299932421,
+            "std_population": 0.005888083872191382,
+            "worst": -0.00889917529283163
+          }
+        }
+      },
+      {
+        "family": "trend_pullback",
+        "variant": "F_compact_combined",
+        "scores": {
+          "event_return_skill": {
+            "mean": -0.0034393010156001194,
+            "std_population": 0.00390822334124836,
+            "worst": -0.008052027440007548
+          },
+          "event_probability_skill": {
+            "mean": 0.008072478508284778,
+            "std_population": 0.0020445092717792045,
+            "worst": 0.005199420109960773
+          },
+          "event_prediction_skill_score": {
+            "mean": 0.0023165887463423296,
+            "std_population": 0.0023556624837554737,
+            "worst": 0.0005877964740795827
+          }
+        }
+      },
+      {
+        "family": "vwap_reversion",
+        "variant": "F_existing",
+        "scores": {
+          "event_return_skill": {
+            "mean": 0.04226084357733891,
+            "std_population": 0.013357776748799259,
+            "worst": 0.027756306874759717
+          },
+          "event_probability_skill": {
+            "mean": -0.061141155468872554,
+            "std_population": 0.006912123188601367,
+            "worst": -0.06660164482005637
+          },
+          "event_prediction_skill_score": {
+            "mean": -0.009440155945766823,
+            "std_population": 0.004820014598128603,
+            "worst": -0.013784951295730985
+          }
+        }
+      },
+      {
+        "family": "vwap_reversion",
+        "variant": "F_compact_combined",
+        "scores": {
+          "event_return_skill": {
+            "mean": 0.024453254587393263,
+            "std_population": 0.003661738239317551,
+            "worst": 0.019281231662564347
+          },
+          "event_probability_skill": {
+            "mean": -0.04115796983647183,
+            "std_population": 0.005290794374022745,
+            "worst": -0.048553793924038136
+          },
+          "event_prediction_skill_score": {
+            "mean": -0.008352357624539286,
+            "std_population": 0.004454181911863784,
+            "worst": -0.014636281130736895
+          }
+        }
+      }
+    ],
+    "no_ai_baselines": [
+      {
+        "family": "original",
+        "test_candidates": 393,
+        "policies": {
+          "zero": {
+            "trades": 163,
+            "mean": -0.0007924320354050328,
+            "std": 0.011226220952667468,
+            "worst": -0.03857345070557594,
+            "ci_low": -0.0022070829171115885,
+            "ci_high": 0.000728377628151449,
+            "without_best_5_mean": -0.001827696083775179,
+            "top_5_share_of_positive_returns": 0.24663006037879281
+          },
+          "base": {
+            "trades": 163,
+            "mean": -0.0020165684514261467,
+            "std": 0.011251138921279064,
+            "worst": -0.039862163624942916,
+            "ci_low": -0.003435273654588251,
+            "ci_high": -0.0004964373878341573,
+            "without_best_5_mean": -0.0030507548194679554,
+            "top_5_share_of_positive_returns": 0.2646447924447899
+          },
+          "stress": {
+            "trades": 170,
+            "mean": -0.002798005640070783,
+            "std": 0.011023784318865148,
+            "worst": -0.040185487803557705,
+            "ci_low": -0.004220639039145089,
+            "ci_high": -0.0014159375223076291,
+            "without_best_5_mean": -0.0038034830486249967,
+            "top_5_share_of_positive_returns": 0.27923884379781844
+          }
+        }
+      },
+      {
+        "family": "trend_pullback",
+        "test_candidates": 502,
+        "policies": {
+          "zero": {
+            "trades": 239,
+            "mean": 0.00013737169658363508,
+            "std": 0.009990814923207527,
+            "worst": -0.02508329290550293,
+            "ci_low": -0.0008949533781352893,
+            "ci_high": 0.0013296428526427184,
+            "without_best_5_mean": -0.00046594395832205514,
+            "top_5_share_of_positive_returns": 0.14199885981814328
+          },
+          "base": {
+            "trades": 241,
+            "mean": -0.0015082817195842951,
+            "std": 0.009871056925556012,
+            "worst": -0.026458510606995538,
+            "ci_low": -0.002635170349382667,
+            "ci_high": -0.00046389153129100096,
+            "without_best_5_mean": -0.002113557868603583,
+            "top_5_share_of_positive_returns": 0.15966338922260223
+          },
+          "stress": {
+            "trades": 241,
+            "mean": -0.002028684292440491,
+            "std": 0.009945538012065365,
+            "worst": -0.026773730161297752,
+            "ci_low": -0.0031121956237238936,
+            "ci_high": -0.0009589680835986957,
+            "without_best_5_mean": -0.0026542410999139863,
+            "top_5_share_of_positive_returns": 0.17049992332430167
+          }
+        }
+      },
+      {
+        "family": "vwap_reversion",
+        "test_candidates": 109,
+        "policies": {
+          "zero": {
+            "trades": 72,
+            "mean": 0.0021496304321937617,
+            "std": 0.008091384990063333,
+            "worst": -0.010232239402261811,
+            "ci_low": 0.0006415351825381219,
+            "ci_high": 0.0034662823177115712,
+            "without_best_5_mean": 0.0008334316666329054,
+            "top_5_share_of_positive_returns": 0.3126898543564753
+          },
+          "base": {
+            "trades": 72,
+            "mean": 0.0005331264309110465,
+            "std": 0.008010225209979746,
+            "worst": -0.011510203861455065,
+            "ci_low": -0.0012574593759582537,
+            "ci_high": 0.0019957338871376446,
+            "without_best_5_mean": -0.0008072584926937859,
+            "top_5_share_of_positive_returns": 0.36633963226164085
+          },
+          "stress": {
+            "trades": 75,
+            "mean": -0.00034765091207904247,
+            "std": 0.007926621313432728,
+            "worst": -0.011803959491611246,
+            "ci_low": -0.0018415968862729034,
+            "ci_high": 0.0014716695865644486,
+            "without_best_5_mean": -0.0016719734556244067,
+            "top_5_share_of_positive_returns": 0.3897268590072457
+          }
+        }
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "docs/KAGGLE_CANDIDATE_FEATURES_20261004.md",
+      "role": "研究方法與結果"
+    }
+  ],
+  "residual_risks": [
+    "只有單一研究窗，3 seeds不增加獨立行情樣本",
+    "歷史已重複使用，不是全新final holdout",
+    "費率/滑價/funding準備金為假設，稅後未驗證",
+    "名目交易收益，不含完整帳戶浮虧/保證金/清算",
+    "只比較既有和合併特徵，不能分離flow與setup獨立效果"
+  ],
+  "next_actions": [
+    "先在合法校準/選擇區間分離特徵群效應及分數排序",
+    "沒有跨期成本壓力改善就停止擴模及SAC成效訓練",
+    "建立晚於已觀察歷史的前向封存資料"
+  ]
+}

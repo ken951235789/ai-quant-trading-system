@@ -84,3 +84,41 @@ def test_credential_scan_does_not_print_secret_value(tmp_path):
     with pytest.raises(ValueError) as caught:
         builder.check_source_text(path)
     assert marker not in str(caught.value)
+
+
+def test_candidate_bundle_keeps_flow_but_excludes_private_columns(tmp_path):
+    import numpy as np
+    import pandas as pd
+
+    root = Path(__file__).parents[2]
+    n = 100
+    frame = pd.DataFrame({"timestamp": pd.date_range("2023-01-01", periods=n, freq="15min", tz="UTC"),
+        "symbol": "BTC/USDT", "exchange": "binance_futures", "interval": "15m",
+        "open": 100., "high": 101., "low": 99., "close": 100., "volume": 10.,
+        "quote_asset_volume": 1000., "number_of_trades": np.full(n, 5),
+        "taker_buy_base_volume": 6., "taker_buy_quote_volume": 600., "private_account_note": "DO_NOT_UPLOAD"})
+    source, flow, output = tmp_path / "source.csv", tmp_path / "flow.csv", tmp_path / "out"
+    frame[list(builder.SAFE_COLUMNS)].to_csv(source, index=False)
+    frame.to_csv(flow, index=False)
+    result = builder.build(source, root / "configs/transformer_strategy_event_v2.example.json", output,
+                           "fixture", candidate_features=True, flow_source=flow)
+    assert result["kernel_id"] == "fixture/btc-transformer-candidate-features-v1"
+    package, manifest = runner.prepare_bundle(output / "dataset", tmp_path / "expanded")
+    assert manifest["study"] == "btc_candidate_feature_v1"
+    data = pd.read_csv(package / "data/btc_15m.csv")
+    assert len(data.columns) == 13 and "private_account_note" not in data
+    assert "taker_buy_base_volume" in data
+    assert (package / "src/ai_quant_trading/research/candidate_evaluation.py").exists()
+    assert (package / "scripts/run_candidate_training_research.py").exists()
+    plan = json.loads((package / "execution_plan.json").read_text())
+    assert plan["planned_runs"] == 18 and plan["seeds"] == [42, 137, 2026]
+    assert plan["variants"] == ["F_existing", "F_compact_combined"]
+    metadata = json.loads((output / "kernel/kernel-metadata.json").read_text())
+    assert metadata["is_private"] and not metadata["enable_internet"]
+
+
+def test_unapproved_config_fields_fail_before_packaging(tmp_path):
+    config = tmp_path / "bad.json"
+    config.write_text(json.dumps({"model": {}, "training": {}, "account": "private"}))
+    with pytest.raises(ValueError, match="私人設定"):
+        builder.build(tmp_path / "not_read.csv", config, tmp_path / "out", "fixture")

@@ -122,3 +122,37 @@ def test_invalid_config_and_no_execution_bar_are_rejected():
         replay(bars(33))
     with pytest.raises(ValueError):
         replace(StrategyEventConfig(), spread_bps=-1)
+
+
+def test_research_exit_modes_preserve_original_default_and_only_use_previous_close():
+    frame = bars()
+    frame.loc[3, "event_regime"] = 0
+    frame.loc[6:, "event_regime"] = -1
+    config = StrategyEventConfig(spread_bps=0, funding_reserve_bps_per_settlement=0)
+    def run(mode):
+        return replay_event(frame, 0, config, fee_bps_per_side=0,
+                            slippage_bps_per_side=0, regime_exit=mode)
+    assert run("loss")["exit_endpoint"] == 4
+    assert run("opposite")["exit_endpoint"] == 7
+    assert run("disabled")["exit_endpoint"] == 33
+    with pytest.raises(ValueError):
+        run("unknown")
+
+
+def test_context_features_are_causal_and_use_only_completed_previous_day():
+    frame = bars(4000)
+    frame["volume"] = np.linspace(1, 2, len(frame))
+    config = StrategyEventConfig(warmup_hours=200, feature_profile="context_v2")
+    original = prepare_event_frame(frame, config)
+    columns = [name for name in original if "context_" in name]
+    assert len(columns) == 20
+    changed = frame.copy()
+    changed.loc[3500:, ["open", "high", "low", "close"]] *= 2
+    changed.loc[3500:, "volume"] *= 5
+    altered = prepare_event_frame(changed, config)
+    pd.testing.assert_frame_equal(original.iloc[:3500], altered.iloc[:3500])
+    # 開始日只有部分 K 棒，隔天不能把不完整日範圍當完整前日。
+    partial_next_day = original.timestamp.dt.date == pd.Timestamp("2024-01-02").date()
+    assert original.loc[partial_next_day, "mtf_15m_context_previous_day_high_distance_atr"].isna().all()
+    complete_previous_day = original.timestamp.dt.date == pd.Timestamp("2024-01-03").date()
+    assert original.loc[complete_previous_day, "mtf_15m_context_previous_day_high_distance_atr"].notna().all()

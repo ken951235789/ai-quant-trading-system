@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import platform
 import stat
@@ -14,6 +15,9 @@ import sys
 from time import monotonic
 import traceback
 from zipfile import ZipFile
+
+for key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    os.environ[key] = "2"
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -55,7 +59,7 @@ def prepare_bundle(input_root: Path, destination: Path) -> tuple[Path, dict]:
                     raise ValueError("研究包包含不安全路徑或連結")
             archive.extractall(root)
     manifest = json.loads((root / "strategy_event_manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("study") != "btc_strategy_event_v1" or not manifest.get("research_only"):
+    if manifest.get("study") not in {"btc_strategy_event_v1", "btc_candidate_feature_v1"} or not manifest.get("research_only"):
         raise ValueError("不支援的研究契約")
     files = manifest["files"]
     expected_files = set(files) | {"strategy_event_manifest.json"}
@@ -98,18 +102,40 @@ def main() -> int:
         config = TransformerTrainingConfig(**payload["training"])
         if config.trading_target_mode != "strategy_event":
             raise ValueError("這不是事件研究設定")
-        if args.local_smoke:
+        if args.local_smoke and manifest["study"] == "btc_strategy_event_v1":
             model = replace(model, sequence_length=32, d_model=16, n_layers=1,
                             feedforward_dim=32, horizon_adapter_dim=8)
             config = replace(config, epochs=1, max_rows_per_source=16000,
                              device="cpu", mixed_precision=False)
-        elif not torch.cuda.is_available():
+        elif not args.local_smoke and not torch.cuda.is_available():
             raise RuntimeError("Kaggle 沒有 GPU；不默默改用 CPU 消耗執行時間")
         hardware = {"python": platform.python_version(), "torch": torch.__version__,
                     "numpy": np.__version__, "pandas": pd.__version__,
                     "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}
         print("硬體：", json.dumps(hardware, ensure_ascii=False), flush=True)
         print("開始事件研究，完整資料筆數：", manifest["data"]["rows"], flush=True)
+        if manifest["study"] == "btc_candidate_feature_v1":
+            import importlib.util
+
+            spec = importlib.util.spec_from_file_location("candidate_research", root / "scripts/run_candidate_training_research.py")
+            research = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(research)
+            execution = json.loads((root / "execution_plan.json").read_text(encoding="utf-8"))
+            arguments = ["--source", str(root / "data/btc_15m.csv"), "--config", str(root / "training_config.json"),
+                "--output", str(output / "candidate_feature_results"), "--feature-study",
+                "--variants", *execution["variants"], "--folds", *map(str, execution["folds"]),
+                "--seeds", *map(str, execution["seeds"]), "--smoke" if args.local_smoke else "--run-research"]
+            write_json(progress_path, {"status": "running_candidate_matrix", "plan": execution})
+            code = research.main(arguments)
+            study = json.loads((output / "candidate_feature_results/study.json").read_text(encoding="utf-8"))
+            write_json(summary_path, {"schema_version": 1, "status": "complete" if code == 0 else "failed",
+                "research_only": True, "live_eligible": False, "smoke_only": args.local_smoke,
+                "duration_seconds": monotonic() - started, "hardware": hardware, "data_manifest": manifest,
+                "execution_plan": execution, "study": study})
+            write_json(progress_path, {"status": "complete" if code == 0 else "failed", "progress": 1.})
+            build_artifact_manifest(output, files=[summary_path, progress_path])
+            print("CANDIDATE_FEATURE_RESEARCH_COMPLETE", flush=True)
+            return code
         write_json(progress_path, {"status": "preparing_data", "progress": 0,
                                    "updated_at": datetime.now(timezone.utc).isoformat()})
         last_message = [None]

@@ -23,8 +23,11 @@ class StrategyEventConfig:
     spread_bps: float = 1.0
     funding_reserve_bps_per_settlement: float = 1.0
     minimum_probability: float = 0.55
+    feature_profile: str = "legacy_v1"
 
     def __post_init__(self) -> None:
+        if self.feature_profile not in {"legacy_v1", "context_v2"}:
+            raise ValueError("事件特徵版本不支援")
         if self.max_holding_bars < 1 or self.cooldown_bars < 0 or self.warmup_hours < 200:
             raise ValueError("事件持有／冷卻設定不合法，暖機至少 200 小時")
         values = (self.stop_atr, self.target_atr, self.adx_threshold, self.spread_bps,
@@ -144,14 +147,71 @@ def prepare_event_frame(frame: pd.DataFrame, config: StrategyEventConfig) -> pd.
     result["mtf_15m_breakout_low_distance"] = result["close"] / prior_low - 1
     result["hour_sin"] = np.sin(decision_times.hour * 2 * np.pi / 24)
     result["hour_cos"] = np.cos(decision_times.hour * 2 * np.pi / 24)
+    if config.feature_profile == "context_v2":
+        result = _add_event_context(result)
+    return result
+
+
+def _add_event_context(frame: pd.DataFrame) -> pd.DataFrame:
+    """只描述訊號棒收盤時可知的位置，不宣稱觀察到真實停損單或 CiC。"""
+    result = frame.copy()
+    atr = result["event_atr"].replace(0, np.nan)
+    close, high, low = result["close"], result["high"], result["low"]
+    body_high = result[["open", "close"]].max(axis=1)
+    body_low = result[["open", "close"]].min(axis=1)
+    span = (high - low).replace(0, np.nan)
+    daily_key = result["timestamp"].dt.floor("1D")
+    daily = result.groupby(daily_key).agg(high=("high", "max"), low=("low", "min"), count=("close", "count"))
+    # 以開盤日歸屬 K 棒；只映射前一個完整 UTC 日，不偷看當日最終高低。
+    previous = daily.shift(1).where(daily["count"].shift(1).eq(96))
+    previous_high = daily_key.map(previous["high"])
+    previous_low = daily_key.map(previous["low"])
+    running_high = high.groupby(daily_key).cummax()
+    running_low = low.groupby(daily_key).cummin()
+    cumulative_volume = result["volume"].groupby(daily_key).cumsum().replace(0, np.nan)
+    typical = (high + low + close) / 3
+    vwap = (typical * result["volume"]).groupby(daily_key).cumsum() / cumulative_volume
+    trend = pd.concat([
+        np.sign(result[f"mtf_{token}_ema50_200_spread"])
+        for token in ("15m", "1h", "4h")
+    ], axis=1)
+    day_range = (running_high - running_low).replace(0, np.nan)
+    valid_day = previous_high.notna() & previous_low.notna()
+    values = {
+        "body_atr": (close - result["open"]) / atr,
+        "upper_wick_atr": (high - body_high) / atr,
+        "lower_wick_atr": (body_low - low) / atr,
+        "close_location": (close - low) / span,
+        "previous_day_high_distance_atr": (close - previous_high) / atr,
+        "previous_day_low_distance_atr": (close - previous_low) / atr,
+        "previous_day_range_position": (close - previous_low) / (previous_high - previous_low).replace(0, np.nan),
+        "previous_day_sweep_high": ((high > previous_high) & (close < previous_high)).astype(float).where(valid_day),
+        "previous_day_sweep_low": ((low < previous_low) & (close > previous_low)).astype(float).where(valid_day),
+        "day_range_atr": day_range / atr,
+        "day_range_position": (close - running_low) / day_range,
+        "day_vwap_distance_atr": (close - vwap) / atr,
+        "breakout_high_excess_atr": (close - high.shift(1).rolling(20).max()) / atr,
+        "breakout_low_excess_atr": (low.shift(1).rolling(20).min() - close) / atr,
+        "trend_consensus": trend.mean(axis=1, skipna=False),
+        "trend_disagreement": trend.std(axis=1, ddof=0, skipna=False),
+        "fast_slow_conflict": (trend.iloc[:, 0] * trend.iloc[:, 2]),
+        "weekday_sin": np.sin(result["timestamp"].dt.dayofweek * 2 * np.pi / 7),
+        "weekday_cos": np.cos(result["timestamp"].dt.dayofweek * 2 * np.pi / 7),
+        "weekend": (result["timestamp"].dt.dayofweek >= 5).astype(float),
+    }
+    for name, value in values.items():
+        result[f"mtf_15m_context_{name}"] = value
     return result
 
 
 def replay_event(
     frame: pd.DataFrame, endpoint: int, config: StrategyEventConfig, *,
     fee_bps_per_side: float, slippage_bps_per_side: float,
+    regime_exit: str = "loss",
 ) -> dict[str, float | int | str]:
     """訊號收盤後下一開盤進場；跳空取較差價，同棒停利停損採停損優先。"""
+    if regime_exit not in {"loss", "opposite", "disabled"}:
+        raise ValueError("制度出場模式不合法")
     side = int(frame.iloc[endpoint]["candidate_side"])
     if side not in (-1, 1) or endpoint + config.max_holding_bars + 1 >= len(frame):
         raise ValueError("事件方向不合法，或沒有足夠的出場執行 K 棒")
@@ -174,7 +234,10 @@ def replay_event(
         row = frame.iloc[index]
         opening = float(row["open"])
         # 前一收盤已失去趨勢，於此開盤出場，不能偷看本根收盤制度。
-        if index > entry_index and int(frame.iloc[index - 1]["event_regime"]) != side:
+        previous_regime = int(frame.iloc[index - 1]["event_regime"])
+        regime_changed = ((regime_exit == "loss" and previous_regime != side)
+                          or (regime_exit == "opposite" and previous_regime == -side))
+        if index > entry_index and regime_changed:
             exit_index, exit_reference, reason = index, opening, "regime"
             break
         stop_hit = row["low"] <= stop if side == 1 else row["high"] >= stop
@@ -214,10 +277,10 @@ def build_event_outcomes(frame: pd.DataFrame, config: StrategyEventConfig, *,
     return pd.DataFrame(rows)
 
 
-def evaluate_event_predictions(predictions: pd.DataFrame, horizon: int,
-                               config: StrategyEventConfig, minimum_edge_bps: float
-                               ) -> dict[str, float]:
-    """相同事件成交結果比較固定策略與 AI 過濾；不把重疊交易全部相加。"""
+def select_event_trades(predictions: pd.DataFrame, horizon: int,
+                        config: StrategyEventConfig, minimum_edge_bps: float, *,
+                        filtered: bool) -> tuple[pd.DataFrame, dict[str, int]]:
+    """共用不重疊成交與拒絕原因；進場判斷不使用候選的未來收益。"""
     required = ["series_index", "endpoint", "event_exit_endpoint",
                 f"tradeability_probability_{horizon}", f"predicted_return_{horizon}",
                 f"actual_return_{horizon}"]
@@ -228,23 +291,39 @@ def evaluate_event_predictions(predictions: pd.DataFrame, horizon: int,
             or (predictions["event_exit_endpoint"] <= predictions["endpoint"]).any()
             or not predictions[f"tradeability_probability_{horizon}"].between(0, 1).all()):
         raise ValueError("事件預測含非有限值、重複列、錯誤出場時間或非法機率")
+    if not np.isfinite(minimum_edge_bps) or minimum_edge_bps < 0:
+        raise ValueError("事件淨收益門檻必須為非負有限數值")
+    selected: list[int] = []
+    reasons = {"position_or_cooldown": 0, "probability_only": 0, "return_only": 0, "both": 0}
+    frame = predictions.reset_index(drop=True)
+    for _, group in frame.groupby("series_index", sort=False):
+        next_signal = -1
+        for index, row in group.sort_values("endpoint").iterrows():
+            if row["endpoint"] < next_signal:
+                reasons["position_or_cooldown"] += 1
+                continue
+            probability_reject = row[f"tradeability_probability_{horizon}"] < config.minimum_probability
+            return_reject = row[f"predicted_return_{horizon}"] <= minimum_edge_bps / 10_000
+            if filtered and (probability_reject or return_reject):
+                reason = "both" if probability_reject and return_reject else (
+                    "probability_only" if probability_reject else "return_only")
+                reasons[reason] += 1
+                continue
+            selected.append(index)
+            next_signal = int(row["event_exit_endpoint"]) + config.cooldown_bars + 1
+    return frame.loc[selected].copy(), reasons
+
+
+def evaluate_event_predictions(predictions: pd.DataFrame, horizon: int,
+                               config: StrategyEventConfig, minimum_edge_bps: float
+                               ) -> dict[str, float]:
+    """相同事件成交結果比較固定策略與 AI 過濾；不把重疊交易全部相加。"""
     result: dict[str, float] = {}
     for name in ("baseline", "filtered"):
-        returns: list[float] = []
-        for _, group in predictions.groupby("series_index", sort=False):
-            next_signal = -1
-            for row in group.sort_values("endpoint").to_dict("records"):
-                if row["endpoint"] < next_signal:
-                    continue
-                if name == "filtered" and (
-                    row[f"tradeability_probability_{horizon}"] < config.minimum_probability
-                    or row[f"predicted_return_{horizon}"] <= minimum_edge_bps / 10_000
-                ):
-                    continue
-                returns.append(float(row[f"actual_return_{horizon}"]))
-                # 出場當根不反手，之後完整等待 cooldown 根。
-                next_signal = int(row["event_exit_endpoint"]) + config.cooldown_bars + 1
-        values = np.asarray(returns)
+        trades, reasons = select_event_trades(predictions, horizon, config, minimum_edge_bps,
+                                              filtered=name == "filtered")
+        values = trades[f"actual_return_{horizon}"].to_numpy(dtype=float)
+        result.update({f"event_{name}_rejected_{key}": float(value) for key, value in reasons.items()})
         result[f"event_{name}_trades"] = float(len(values))
         result[f"event_{name}_net_expectancy"] = float(values.mean()) if len(values) else 0.0
         result[f"event_{name}_win_rate"] = float((values > 0).mean()) if len(values) else 0.0

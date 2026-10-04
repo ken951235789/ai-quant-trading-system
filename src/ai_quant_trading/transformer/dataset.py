@@ -1077,6 +1077,15 @@ def prepare_transformer_datasets(
     if not paths:
         raise ValueError("至少選擇一份特徵 CSV")
     event_mode = training_config.trading_target_mode == "strategy_event"
+    candidate = None
+    if training_config.candidate_contract is not None:
+        from ai_quant_trading.research.candidate_contract import (
+            CandidateContract, prepare_candidate_frame, candidate_outcomes, uniqueness_weights,
+        )
+
+        candidate = CandidateContract(**training_config.candidate_contract)
+        if len(paths) != 1:
+            raise ValueError("候選契約 v1 每個模型只接受一份同市場快照，禁止重複行情或混合策略")
     event_config = (
         StrategyEventConfig(**training_config.strategy_event_config) if event_mode else None
     )
@@ -1086,7 +1095,8 @@ def prepare_transformer_datasets(
               for path in paths]
     frames = [item[0] for item in loaded]
     if event_config:
-        frames = [prepare_event_frame(frame, event_config) for frame in frames]
+        frames = [prepare_candidate_frame(frame, candidate) if candidate else prepare_event_frame(frame, event_config)
+                  for frame in frames]
     sources = tuple(item[1] for item in loaded)
     intervals = {source.interval for source in sources if source.interval}
     if len(intervals) > 1:
@@ -1098,7 +1108,7 @@ def prepare_transformer_datasets(
                                 if column.startswith("mtf_")
                                 or column in {"candidate_side", "hour_sin", "hour_cos"})
         if len(feature_columns) > model_config.input_features:
-            raise ValueError("事件特徵上限不足；input_features 至少需要 53")
+            raise ValueError(f"事件特徵上限不足；input_features 至少需要 {len(feature_columns)}")
     else:
         feature_columns = _select_feature_columns(frames, model_config.input_features)
     feature_columns = _prune_training_features(
@@ -1108,7 +1118,7 @@ def prepare_transformer_datasets(
     )
     if not feature_columns:
         raise ValueError("Transformer 訓練區段沒有任何可用數值特徵")
-    max_horizon = max(model_config.return_horizons) + int(event_mode)
+    max_horizon = max(model_config.return_horizons) + int(event_mode) + int(candidate is not None)
     raw_series: list[dict[str, object]] = []
     training_feature_blocks: list[np.ndarray] = []
     training_return_blocks: list[np.ndarray] = []
@@ -1126,7 +1136,7 @@ def prepare_transformer_datasets(
         event_metadata: dict[str, np.ndarray] = {}
         eligible = np.ones(len(frame), dtype=bool)
         if event_config:
-            outcomes = build_event_outcomes(
+            outcomes = candidate_outcomes(frame, candidate) if candidate else build_event_outcomes(
                 frame, event_config, fee_bps_per_side=training_config.fee_bps_per_side,
                 slippage_bps_per_side=training_config.slippage_bps_per_side,
             )
@@ -1150,6 +1160,11 @@ def prepare_transformer_datasets(
                 values = np.zeros(len(frame))
                 values[points] = outcomes[column].to_numpy()
                 event_metadata[column] = values
+            if candidate:
+                values = np.zeros(len(frame))
+                values[points] = outcomes.label_end_endpoint.to_numpy()
+                event_metadata["label_end_endpoint"] = values
+                event_metadata["entry_regime"] = frame.event_regime.to_numpy(dtype=float)
         future_returns = targets["future_returns"]
         future_directions = targets["future_directions"]
         movement_directions = targets["movement_directions"]
@@ -1172,6 +1187,10 @@ def prepare_transformer_datasets(
             train_ep = train_ep[eligible[train_ep]]
             validation_ep = validation_ep[eligible[validation_ep]]
             test_ep = test_ep[eligible[test_ep]]
+        sample_weights = _recency_sample_weights(frame, train_ep, training_config)
+        if candidate:
+            sample_weights *= uniqueness_weights(len(frame), train_ep,
+                event_metadata["exit_endpoint"][train_ep].astype(int))
         if not len(train_ep) or not len(validation_ep) or not len(test_ep):
             raise ValueError("資料不足以完成時間切分；請增加 K 線筆數、縮短序列或縮短預測週期")
         training_feature_blocks.append(feature_values[:train_cut])
@@ -1198,11 +1217,7 @@ def prepare_transformer_datasets(
                 "future_excursions": future_excursions,
                 "tradeability": tradeability,
                 "volatility_regime_source": volatility_regime_source,
-                "sample_weights": _recency_sample_weights(
-                    frame,
-                    train_ep,
-                    training_config,
-                ),
+                "sample_weights": sample_weights,
                 "train_endpoints": train_ep,
                 "validation_endpoints": validation_ep,
                 "test_endpoints": test_ep,
@@ -1394,6 +1409,12 @@ def prepare_transformer_datasets(
             "purge_bars": max_horizon,
             "exit_reason_codes": {"0": "stop", "1": "target", "2": "time", "3": "regime"},
         }
+    if candidate:
+        with paths[0].open("rb") as source:
+            source_sha256 = hashlib.file_digest(source, "sha256").hexdigest()
+        diagnostics["candidate_contract"] = {**candidate.metadata(), "source_sha256": source_sha256,
+            "loaded_rows": len(frames[0]), "max_rows_per_source": training_config.max_rows_per_source,
+            "feature_columns": list(feature_columns), "purge_bars": max_horizon}
     return PreparedTransformerData(
         train=MarketSequenceDataset(
             prepared_series,

@@ -78,7 +78,8 @@ def check_source_text(path: Path) -> None:
         raise ValueError(f"來源疑似包含硬編碼憑證，禁止上傳：{path.name}")
 
 
-def build(source: Path, config_path: Path, output: Path, username: str) -> dict:
+def build(source: Path, config_path: Path, output: Path, username: str,
+          *, candidate_features: bool = False, flow_source: Path | None = None) -> dict:
     if output.exists():
         raise FileExistsError("輸出目錄已存在；請換新目錄，避免覆蓋或重複提交")
     if not re.fullmatch(r"[A-Za-z0-9_-]+", username):
@@ -86,8 +87,12 @@ def build(source: Path, config_path: Path, output: Path, username: str) -> dict:
     sys.path.insert(0, str(SRC))
     from ai_quant_trading.transformer.config import TemporalTransformerConfig, TransformerTrainingConfig
     from ai_quant_trading.transformer.strategy_events import validate_event_bars
+    from ai_quant_trading.research.candidate_features import FLOW_COLUMNS, enrich_flow_source, validate_flow
 
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    if set(config) != {"model", "training"}:
+        raise ValueError("上傳設定只允許 model 與 training，不接受其他私人設定")
+    check_source_text(config_path)
     config["training"]["device"] = "cuda"
     TemporalTransformerConfig(**config["model"])
     training = TransformerTrainingConfig(**config["training"])
@@ -96,6 +101,17 @@ def build(source: Path, config_path: Path, output: Path, username: str) -> dict:
     initial_hash = sha256(source)
     frame = pd.read_csv(source, usecols=list(SAFE_COLUMNS))[list(SAFE_COLUMNS)]
     validate_event_bars(frame)
+    flow_hash = None
+    if candidate_features:
+        if flow_source is None:
+            raise ValueError("新候選研究需要明確指定本機成交來源")
+        flow_hash = sha256(flow_source)
+        # 不讓可識別帳戶或未驗證的其他衍生品欄位進入上傳檔。
+        extra = pd.read_csv(flow_source, usecols=[*SAFE_COLUMNS, *FLOW_COLUMNS])
+        frame = enrich_flow_source(frame, extra)
+        validate_flow(frame)
+        if sha256(flow_source) != flow_hash:
+            raise ValueError("補充來源在讀取時變動")
     if sha256(source) != initial_hash:
         raise ValueError("來源在讀取時變動，請先建立不變快照")
     output.mkdir(parents=True, exist_ok=False)
@@ -106,20 +122,36 @@ def build(source: Path, config_path: Path, output: Path, username: str) -> dict:
     (bundle / "training_config.json").write_text(
         json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8",
     )
-    for path in local_dependencies(SRC, "ai_quant_trading.transformer.training"):
+    dependencies = set(local_dependencies(SRC, "ai_quant_trading.transformer.training"))
+    if candidate_features:
+        for entry in ("ai_quant_trading.research.candidate_evaluation", "ai_quant_trading.research.event_attribution",
+                      "ai_quant_trading.transformer.event_study"):
+            dependencies.update(local_dependencies(SRC, entry))
+    for path in sorted(dependencies):
         check_source_text(path)
         destination = bundle / "src" / path.relative_to(SRC)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, destination)
+    if candidate_features:
+        research_runner = ROOT / "scripts/run_candidate_training_research.py"
+        check_source_text(research_runner)
+        (bundle / "scripts").mkdir()
+        shutil.copy2(research_runner, bundle / "scripts" / research_runner.name)
+        execution = {"seeds": [42, 137, 2026], "variants": ["F_existing", "F_compact_combined"],
+            "folds": [3], "maximum_epochs": training.epochs, "planned_runs": 18,
+            "reason": "事前選定合併特徵與既有對照，不按煙霧 Test 排名挑選策略或特徵",
+            "scope": "單一較近期研究測試時段；不是完整三段向前驗證或新封存集",
+            "sac": "not_started", "live_eligible": False}
+        (bundle / "execution_plan.json").write_text(json.dumps(execution, ensure_ascii=False, indent=2), encoding="utf-8")
     files = {path.relative_to(bundle).as_posix(): {"sha256": sha256(path), "size": path.stat().st_size}
              for path in sorted(bundle.rglob("*")) if path.is_file()}
     revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
                               text=True, check=True).stdout.strip()
     manifest = {
-        "schema_version": 1, "study": "btc_strategy_event_v1", "research_only": True,
+        "schema_version": 1, "study": "btc_candidate_feature_v1" if candidate_features else "btc_strategy_event_v1", "research_only": True,
         "created_at": datetime.now(timezone.utc).isoformat(), "git_revision": revision,
         "dirty_worktree": True, "configuration": "training_config.json", "files": files,
-        "data": {"path": "data/btc_15m.csv", "rows": len(frame), "columns": list(SAFE_COLUMNS),
+        "data": {"path": "data/btc_15m.csv", "rows": len(frame), "columns": list(frame.columns),
                  "start_utc": pd.to_datetime(frame.timestamp.iloc[0], utc=True).isoformat(),
                  "end_utc": pd.to_datetime(frame.timestamp.iloc[-1], utc=True).isoformat(),
                  "original_source_sha256": initial_hash, "sha256": sha256(market)},
@@ -127,6 +159,9 @@ def build(source: Path, config_path: Path, output: Path, username: str) -> dict:
                    "test_is_pristine_holdout": False, "funding": "assumed_reserve_not_actual",
                    "tax": "unverified", "no_credentials_included_by_allowlist": True},
     }
+    if candidate_features:
+        manifest["data"]["flow_source_sha256"] = flow_hash
+        manifest["data"]["matched_ohlcv_rows"] = len(frame)
     (bundle / "strategy_event_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8",
     )
@@ -138,17 +173,17 @@ def build(source: Path, config_path: Path, output: Path, username: str) -> dict:
         for path in sorted(bundle.rglob("*")):
             if path.is_file():
                 archive.write(path, path.relative_to(bundle).as_posix())
-    dataset_id = f"{username}/btc-strategy-event-v1-input"
-    kernel_id = f"{username}/btc-transformer-strategy-event-v1"
+    dataset_id = f"{username}/btc-candidate-features-v1-input" if candidate_features else f"{username}/btc-strategy-event-v1-input"
+    kernel_id = f"{username}/btc-transformer-candidate-features-v1" if candidate_features else f"{username}/btc-transformer-strategy-event-v1"
     (dataset / "dataset-metadata.json").write_text(json.dumps({
-        "title": "BTC Strategy Event V1 Input", "id": dataset_id,
+        "title": "BTC Candidate Features V1 Input" if candidate_features else "BTC Strategy Event V1 Input", "id": dataset_id,
         "licenses": [{"name": "other"}], "description": "Private strategy-event research snapshot.",
     }, indent=2), encoding="utf-8")
     runner = ROOT / "scripts/kaggle_strategy_event_runner.py"
     check_source_text(runner)
     shutil.copy2(runner, kernel / "train_strategy_event.py")
     (kernel / "kernel-metadata.json").write_text(json.dumps({
-        "id": kernel_id, "title": "BTC Transformer Strategy Event V1",
+        "id": kernel_id, "title": "BTC Transformer Candidate Features V1" if candidate_features else "BTC Transformer Strategy Event V1",
         "code_file": "train_strategy_event.py", "language": "python", "kernel_type": "script",
         "is_private": True, "enable_gpu": True, "enable_internet": False,
         "machine_shape": "NvidiaTeslaT4", "dataset_sources": [dataset_id],
@@ -165,6 +200,9 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=Path, default=ROOT / "configs/transformer_strategy_event.example.json")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--username", required=True)
+    parser.add_argument("--candidate-features", action="store_true")
+    parser.add_argument("--flow-source", type=Path)
     args = parser.parse_args()
-    print(json.dumps(build(args.source, args.config, args.output, args.username),
+    print(json.dumps(build(args.source, args.config, args.output, args.username,
+                           candidate_features=args.candidate_features, flow_source=args.flow_source),
                      ensure_ascii=False, indent=2))

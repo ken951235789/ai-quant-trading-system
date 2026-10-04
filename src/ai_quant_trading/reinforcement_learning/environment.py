@@ -268,6 +268,7 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
         spread_rate: float,
     ) -> tuple[str, float, float, float, float]:
         previous_quantity = self._quantity
+        cash_before = self._cash
         quantity_delta = desired_quantity - previous_quantity
         if abs(quantity_delta) <= 1e-12:
             return "HOLD", reference_price, 0.0, 0.0, 0.0
@@ -313,7 +314,8 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
         )
         self._quantity = new_quantity
         if abs(previous_quantity) <= 1e-12 and abs(new_quantity) > 1e-12:
-            self._trade_entry_equity = self._cash
+            # 單筆損益包含進場費；不能以已扣進場費的現金當作起點。
+            self._trade_entry_equity = cash_before
         elif previous_quantity * new_quantity < 0:
             self._trade_entry_equity = self._cash
         return side, fill_price, trade_notional, fee, slippage_cost
@@ -323,10 +325,16 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
         fill_price: float,
         *,
         liquidation: bool,
-    ) -> tuple[float, float]:
+        spread_rate: float = 0.0,
+    ) -> tuple[float, float, float]:
         if abs(self._quantity) <= 1e-12:
-            return 0.0, 0.0
+            return 0.0, 0.0, 0.0
         quantity = self._quantity
+        # 保護單亦以市價退出，沿用一般調倉的單邊滑價與半價差。
+        reference_price = fill_price
+        direction = 1.0 if quantity > 0 else -1.0
+        fill_price *= 1 - direction * (self._episode_slippage_rate + spread_rate / 2)
+        slippage_cost = abs(quantity) * abs(fill_price - reference_price)
         notional = abs(quantity) * fill_price
         realized = quantity * (fill_price - self._average_entry_price)
         fee_rate = self.config.fee_rate + (self.config.liquidation_fee_rate if liquidation else 0.0)
@@ -350,7 +358,7 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
         self._stop_price = None
         self._take_profit_price = None
         self._liquidation_price = None
-        return notional, fee
+        return notional, fee, slippage_cost
 
     @staticmethod
     def _next_average_entry(
@@ -759,7 +767,13 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
             )
             if liquidation_hit and gap_liquidation:
                 exit_price = next_open
-                _, liquidation_fee = self._force_perpetual_exit(exit_price, liquidation=True)
+                exit_notional, exit_fee, exit_slippage = self._force_perpetual_exit(
+                    exit_price, liquidation=True, spread_rate=spread_rate
+                )
+                trade_notional += exit_notional
+                fee += exit_notional * self.config.fee_rate
+                liquidation_fee = exit_fee - exit_notional * self.config.fee_rate
+                slippage_cost += exit_slippage
                 liquidated = True
                 side = "LIQUIDATION"
             elif stop_hit:
@@ -770,9 +784,12 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
                     if direction > 0
                     else max(next_open, self._stop_price)
                 )
-                stop_notional, stop_fee = self._force_perpetual_exit(exit_price, liquidation=False)
+                stop_notional, stop_fee, stop_slippage = self._force_perpetual_exit(
+                    exit_price, liquidation=False, spread_rate=spread_rate
+                )
                 trade_notional += stop_notional
                 fee += stop_fee
+                slippage_cost += stop_slippage
                 stop_triggered = True
                 side = "STOP"
             elif take_profit_hit:
@@ -783,11 +800,12 @@ class PortfolioTradingEnv(gym.Env[np.ndarray, np.ndarray]):
                     if direction > 0
                     else min(next_open, self._take_profit_price)
                 )
-                take_profit_notional, take_profit_fee = self._force_perpetual_exit(
-                    exit_price, liquidation=False
+                take_profit_notional, take_profit_fee, take_profit_slippage = self._force_perpetual_exit(
+                    exit_price, liquidation=False, spread_rate=spread_rate
                 )
                 trade_notional += take_profit_notional
                 fee += take_profit_fee
+                slippage_cost += take_profit_slippage
                 take_profit_triggered = True
                 side = "TAKE_PROFIT"
 

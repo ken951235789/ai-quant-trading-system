@@ -15,9 +15,10 @@ from ai_quant_trading.transformer.inference import _load_checkpoint
 from ai_quant_trading.transformer.training import _split_calibration, train_temporal_transformer
 
 
-def configs():
+def configs(profile="legacy_v1"):
     root = Path(__file__).resolve().parents[2]
-    payload = json.loads((root / "configs/transformer_strategy_event.example.json").read_text())
+    name = "transformer_strategy_event_v2.example.json" if profile == "context_v2" else "transformer_strategy_event.example.json"
+    payload = json.loads((root / "configs" / name).read_text())
     model = TemporalTransformerConfig(**payload["model"])
     training = TransformerTrainingConfig(**payload["training"])
     return (replace(model, d_model=16, sequence_length=8, n_layers=1,
@@ -44,12 +45,14 @@ def write_source(path):
     return path
 
 
-def test_event_split_labels_and_training_smoke(tmp_path):
+@pytest.mark.parametrize("profile", ["legacy_v1", "context_v2"])
+def test_event_split_labels_and_training_smoke(tmp_path, profile):
     source = write_source(tmp_path / "events.csv")
-    model, config = configs()
+    model, config = configs(profile)
     data = prepare_transformer_datasets([source], model, config)
     assert data.scaler.label_mode == "strategy_event_net_pnl_v1"
-    assert len(data.scaler.feature_columns) <= 53
+    assert len(data.scaler.feature_columns) <= (73 if profile == "context_v2" else 53)
+    assert any("context_" in column for column in data.scaler.feature_columns) == (profile == "context_v2")
     assert not {"open", "high", "low", "close", "volume", "future_cheat", "event_atr"}.intersection(
         data.scaler.feature_columns)
     calibration, selection, protocol = _split_calibration(data, config)
@@ -79,6 +82,21 @@ def test_event_split_labels_and_training_smoke(tmp_path):
     assert "calibrated_tradeability_brier_32" in result.metrics
     assert "regime_accuracy" not in result.metrics
     assert np.isfinite(list(result.metrics.values())).all()
+    assert not any(column.startswith(("direction_", "regime_", "volatility_", "edge_"))
+                   for column in predictions)
+    history = pd.read_csv(result.run_dir / "history.csv")
+    assert "validation_event_prediction_skill_score" in history
+    if profile == "context_v2":
+        assert summary["training_config"]["return_loss_kind"] == "mse"
+        assert summary["checkpoint_metric"] == "event_prediction_skill_score"
+        assert summary["best_checkpoint_value"] == pytest.approx(
+            history["validation_event_prediction_skill_score"].max())
+    for split in ("validation", "test"):
+        diagnostics = json.loads((result.run_dir / f"{split}_event_diagnostics.json").read_text(encoding="utf-8"))
+        assert diagnostics["reference"] == summary["event_reference"]
+        assert diagnostics["reference_source"] == "train_only"
+        assert diagnostics["live_eligible"] is False
+        assert diagnostics["research_gate"] == summary["event_diagnostics"][split]["research_gate"]
 
 
 def test_event_configuration_cannot_silently_repurpose_other_heads(tmp_path):

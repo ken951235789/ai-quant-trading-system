@@ -155,6 +155,7 @@ class TransformerTrainingConfig:
     validation_fraction: float = 0.20
     seed: int = 42
     return_loss_weight: float = 1.0
+    return_loss_kind: str = "smooth_l1"
     volatility_loss_weight: float = 0.5
     regime_loss_weight: float = 0.25
     direction_loss_weight: float = 0.50
@@ -199,8 +200,15 @@ class TransformerTrainingConfig:
     economic_minimum_edge_bps: float = 2.0
     economic_downside_penalty: float = 0.10
     strategy_event_config: dict[str, object] | None = None
+    candidate_contract: dict[str, object] | None = None
 
     def __post_init__(self) -> None:
+        if self.candidate_contract is not None:
+            from ai_quant_trading.research.candidate_contract import CandidateContract, validate_training_contract
+
+            validate_training_contract(CandidateContract(**self.candidate_contract), self)
+        if self.return_loss_kind not in {"smooth_l1", "mse"}:
+            raise ValueError("return_loss_kind 必須為 smooth_l1 或 mse")
         object.__setattr__(self, "training_horizon_weights", tuple(
             float(value) for value in self.training_horizon_weights
         ))
@@ -218,10 +226,12 @@ class TransformerTrainingConfig:
                         self.volatility_regime_loss_weight)
             if any(inactive) or self.tradeability_loss_weight <= 0:
                 raise ValueError("事件模式僅訓練淨收益、分位數及交易成功機率")
-            if self.checkpoint_metric != "validation_loss" or self.calibration_fraction <= 0:
-                raise ValueError("事件模式需要獨立校準區段，並以 validation_loss 選模")
+            if self.checkpoint_metric not in {"validation_loss", "event_prediction_skill_score"} or self.calibration_fraction <= 0:
+                raise ValueError("事件模式需要獨立校準區段及事件專用選模指標")
         elif self.strategy_event_config is not None:
             raise ValueError("strategy_event_config 僅供 strategy_event 模式使用")
+        if self.checkpoint_metric == "event_prediction_skill_score" and self.trading_target_mode != "strategy_event":
+            raise ValueError("event_prediction_skill_score 僅供事件研究使用")
         if not 0 <= self.calibration_fraction < 1:
             raise ValueError("calibration_fraction 必須介於 0（含）與 1（不含）")
         if self.economic_minimum_trades < 2:
@@ -307,6 +317,7 @@ class TransformerTrainingConfig:
             "cost_aware_direction_balanced_accuracy",
             "deployment_horizon_skill_score",
             "economic_selection_score",
+            "event_prediction_skill_score",
         }:
             raise ValueError("checkpoint_metric 不支援")
         if any(value < 0 for value in self.checkpoint_horizon_weights):

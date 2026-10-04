@@ -74,12 +74,17 @@ trained Transformer or SAC checkpoint and is not evidence of trading performance
 
 ## Honest Current Result
 
-The latest strategy-event study (2026-09-24) completed on Kaggle with seed 42. Its fixed
-breakout baseline made 329 research-test trades with a mean net return of -0.2561% per
-entry notional; the Transformer filter made zero trades. This is a working research
-pipeline, not evidence of a profitable model. The event checkpoint is intentionally
-blocked from legacy SAC/live inference. Historical test periods reused during research
-are not pristine final holdouts. See the [event research guide](docs/transformer_strategy_event_20260924.md).
+The latest paired study (2026-10-04) completed 18 models on Kaggle: three fixed candidate
+strategies, existing versus compact combined features, and three seeds on one research
+window. Every Transformer filter made zero test trades. Prediction changes were mixed;
+the experiment did not establish a cost-robust trading edge. SAC and live promotion remain
+blocked. The unfiltered VWAP baseline was slightly positive at base costs but negative
+under increased slippage. These are per-trade notional returns, not account returns.
+See the [experiment and results](docs/KAGGLE_CANDIDATE_FEATURES_20261004.md).
+
+Event checkpoints are intentionally blocked from legacy SAC/live inference. Reused
+historical research tests are not pristine final holdouts; three seeds do not triple the
+number of independent market observations.
 
 Earlier results, using different models and evaluation protocols, are retained below:
 

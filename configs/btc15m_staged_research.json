@@ -1,0 +1,14 @@
+{
+  "transformer_config": "transformer_strategy_event_v2.example.json",
+  "folds": 3,
+  "seeds": [42, 137, 2026, 2027, 2028],
+  "minimum_trades": 50,
+  "sizing": {
+    "initial_capital": 1000.0,
+    "fixed_fraction": 0.10,
+    "maximum_fraction": 0.20,
+    "reference_atr_fraction": 0.003,
+    "max_settled_drawdown": 0.10,
+    "total_timesteps": 100000
+  }
+}
