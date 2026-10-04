@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "SECURITY_REVIEW-20261004-2B39C333",
+  "report_type": "security_review",
+  "generated_at_utc": "2026-10-04T23:13:12Z",
+  "project": {
+    "name": "AIQuantTradingSystem",
+    "revision": "staged_after_7e4c246",
+    "environment": "Windows; Python 3.13; release staging"
+  },
+  "scope": "機率門檻研究公開更新：暫存區、秘密、圖表、測試與發行邊界",
+  "overall_status": "WARN",
+  "summary": "公開版717測試與4 subtests通過；待提交快照及既有14 commits未發現秘密命中。原始資料、模型、逐筆交易及帳戶內容排除；不是零漏洞認證。",
+  "changes": ["公開門檻研究與標準報告工具。", "聚合資料以欄位及分類值白名單匯出。", "僅增加三張已檢視圖表的明確檔名白名單，未開放任意二進位檔。"],
+  "findings": [
+    {"id": "SEC-001", "severity": "MEDIUM", "status": "ACCEPTED", "category": "static_analysis",
+     "component": "existing_research_utilities", "title": "既有暫存路徑及XML解析提醒仍保留",
+     "evidence": ["Bandit: B108=9, B314=3; 無新增中高風險"],
+     "impact": "不應在不受信任的共享環境或以外部XML輸入使用相關工具。",
+     "recommendation": "後續獨立改進暫存隔離與安全XML解析，本次未擴張修改。"},
+    {"id": "SEC-002", "severity": "LOW", "status": "ACCEPTED", "category": "subprocess",
+     "component": "run_probability_sweep", "title": "固定命令子程序提醒",
+     "evidence": ["B404/B607/B603: 本輪新增4個low"],
+     "impact": "依賴可信Python、Git與PATH；沒有shell字串拼接。",
+     "recommendation": "在可信本機環境執行，保留參數陣列與檔案完整性檢查。"}
+  ],
+  "checks": [
+    {"id": "SEC-001", "name": "Gitleaks 8.30.1 待提交快照", "status": "PASS", "evidence": ["redact 模式，no leaks found"]},
+    {"id": "SEC-002", "name": "既有公開Git歷史", "status": "PASS", "evidence": ["14 commits, no leaks found"]},
+    {"id": "SEC-003", "name": "Git index 檔案邊界", "status": "PASS", "evidence": ["check_public_repository.py --staged，無命中；不包含私人輸出"]},
+    {"id": "REL-001", "name": "公開版完整測試", "status": "PASS", "evidence": ["717 passed, 4 subtests passed"], "duration_seconds": 145.76},
+    {"id": "REL-002", "name": "靜態與產物檢查", "status": "PASS", "evidence": ["Ruff src/tests/scripts/tools", "compileall", "git diff --cached --check", "三張PNG僅有Software/dpi metadata"]},
+    {"id": "SEC-004", "name": "Bandit完整靜態掃描", "status": "WARN", "evidence": ["0 high, 12 medium, 98 low; parser errors=0"]}
+  ],
+  "metrics": {"tests_passed": 717, "subtests_passed": 4, "bandit_high": 0, "bandit_medium": 12, "bandit_low": 98, "new_medium_high": 0, "deployed_model_changed": false},
+  "artifacts": [{"path": "docs/SECURITY_AUDIT_20261005.md", "role": "public_security_summary"}, {"path": "docs/research/probability_thresholds_20261005.json", "role": "sanitized_research_statistics"}],
+  "residual_risks": ["秘密掃描非完整外洩或漏洞證明。", "沒有滲透測試、帳戶後台完整稽核或新依賴漏洞資料庫查詢。", "GitHub歷史公開資訊仍保留，不重寫既有歷史。", "研究優勢及實盤資格仍未通過。"],
+  "next_actions": ["新增commit後再掃描並核對遠端SHA及CI。", "繼續隔離資料、模型、逐筆交易與個人帳戶設定。"]
+}

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/ai-quant-engineering-report-v1.json",
+  "title": "AI Quant Engineering Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "report_id",
+    "report_type",
+    "generated_at_utc",
+    "project",
+    "scope",
+    "overall_status",
+    "summary",
+    "changes",
+    "findings",
+    "checks",
+    "metrics",
+    "artifacts",
+    "residual_risks",
+    "next_actions"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "report_id": {"type": "string", "minLength": 3},
+    "report_type": {
+      "enum": [
+        "data_integrity",
+        "model_research",
+        "live_trading_safety",
+        "release_quality",
+        "security_review",
+        "multi_module"
+      ]
+    },
+    "generated_at_utc": {"type": "string", "format": "date-time"},
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "revision"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "revision": {"type": "string", "minLength": 1},
+        "environment": {"type": "string"}
+      }
+    },
+    "scope": {"type": "string", "minLength": 1},
+    "overall_status": {"enum": ["DRAFT", "PASS", "WARN", "FAIL", "BLOCKED"]},
+    "summary": {"type": "string"},
+    "changes": {"type": "array", "items": {"type": "string"}},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "status", "category", "component", "title", "evidence", "impact", "recommendation"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z]+-[0-9]{3}$"},
+          "severity": {"enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]},
+          "status": {"enum": ["OPEN", "ACCEPTED", "RESOLVED"]},
+          "category": {"type": "string", "minLength": 1},
+          "component": {"type": "string", "minLength": 1},
+          "title": {"type": "string", "minLength": 1},
+          "evidence": {"type": "array", "items": {"type": "string"}},
+          "impact": {"type": "string", "minLength": 1},
+          "recommendation": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "status", "evidence"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "name": {"type": "string", "minLength": 1},
+          "status": {"enum": ["PASS", "WARN", "FAIL", "BLOCKED", "NOT_APPLICABLE"]},
+          "evidence": {"type": "array", "items": {"type": "string"}},
+          "duration_seconds": {"type": "number", "minimum": 0}
+        }
+      }
+    },
+    "metrics": {"type": "object"},
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "role"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "role": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
+        }
+      }
+    },
+    "residual_risks": {"type": "array", "items": {"type": "string"}},
+    "next_actions": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -23,6 +23,12 @@ PRIVATE_SUFFIXES = {
 EMAIL = re.compile(r"[\w.+-]+@([\w.-]+\.[A-Za-z]{2,})")
 WINDOWS_USER = re.compile(r'''[A-Za-z]:[\\/]+Users[\\/]+([^\\/\s`"']+)''')
 PLACEHOLDER_USERS = {"你的帳號", "<username>", "YOUR_USERNAME", "example", "test", "your-user"}
+REVIEWED_PNGS = {
+    "docs/assets/social-preview.png",
+    "docs/assets/probability-sweep-20261005-expectancy.png",
+    "docs/assets/probability-sweep-20261005-trade_count.png",
+    "docs/assets/probability-sweep-20261005-settled_return.png",
+}
 
 
 def inspect_file(name: str, data: bytes, mode: str = "100644") -> list[dict]:
@@ -45,7 +51,7 @@ def inspect_file(name: str, data: bytes, mode: str = "100644") -> list[dict]:
         flag("private_data_directory")
     if len(data) > 2_000_000:
         flag("oversized_file")
-    if name == "docs/assets/social-preview.png" and data.startswith(b"\x89PNG\r\n\x1a\n"):
+    if name in REVIEWED_PNGS and data.startswith(b"\x89PNG\r\n\x1a\n"):
         return findings
     try:
         content = data.decode("utf-8-sig")

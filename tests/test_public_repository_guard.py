@@ -24,6 +24,14 @@ def test_public_examples_allowed():
     assert not guard.inspect_file("data/raw/README.md", b"Public schema only")
 
 
+def test_only_reviewed_figure_names_are_allowed():
+    data = b"\x89PNG\r\n\x1a\n" + b"fixture"
+    for name in guard.REVIEWED_PNGS:
+        assert not guard.inspect_file(name, data)
+    assert guard.inspect_file("docs/assets/unreviewed.png", data)
+    assert guard.inspect_file("docs/assets/probability-sweep-20261005-expectancy.png", data + b"x" * 2_000_000)
+
+
 def test_repository_exchange_credentials_are_empty():
     from dotenv import dotenv_values
 

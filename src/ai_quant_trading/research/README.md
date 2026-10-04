@@ -31,3 +31,9 @@
 `candidate_features.py` 提供固定精簡、成交方向/活動、交易空間/訊號時效特徵。
 沿用 `scripts/run_candidate_training_research.py --feature-study`，沒有第二套訓練引擎。
 中文操作、五組比較與 SAC 前置條件見 [特徵研究](../../../docs/CANDIDATE_FEATURE_STUDY_20261003.md)。
+
+## 機率門檻敏感度
+
+`probability_sweep.py` 使用已保存模型預測，重用候選撮合與不重疊排程，研究 0% 至 100% 門檻。
+`scripts/run_probability_sweep.py` 先稽核輸入，再輸出逐模型、成本與區間比較，不變更正式設定。
+操作、成本假設及結算權益限制見 [門檻研究](../../../docs/PROBABILITY_THRESHOLD_SWEEP.md)。

@@ -74,9 +74,15 @@ trained Transformer or SAC checkpoint and is not evidence of trading performance
 
 ## Honest Current Result
 
+The 2026-10-05 [probability threshold sensitivity study](docs/PROBABILITY_THRESHOLD_RESULTS_20261005.md)
+tested 101 thresholds on 18 existing models, with three cost scenarios and separate Selection/Test windows.
+Lower thresholds restored some trades, but sparse samples and cost/seed instability did not establish
+a deployable edge. The deployed 55% threshold remains unchanged. Aggregate results and charts are public;
+raw market data, weights and trade-level artifacts remain private.
+
 The latest paired study (2026-10-04) completed 18 models on Kaggle: three fixed candidate
 strategies, existing versus compact combined features, and three seeds on one research
-window. Every Transformer filter made zero test trades. Prediction changes were mixed;
+window. Every Transformer filter at the original 55% threshold made zero test trades. Prediction changes were mixed;
 the experiment did not establish a cost-robust trading edge. SAC and live promotion remain
 blocked. The unfiltered VWAP baseline was slightly positive at base costs but negative
 under increased slippage. These are per-trade notional returns, not account returns.
