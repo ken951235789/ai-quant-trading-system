@@ -22,7 +22,7 @@ ai-quant-demo = "ai_quant_trading.public_demo:main"
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "ruff>=0.15.21,<0.16",
+    "ruff>=0.15.21,<0.17",
 ]
 security = [
     "bandit>=1.9.4,<2.0",
