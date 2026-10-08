@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "MODEL_RESEARCH-20261008-JOURNAL",
+  "report_type": "model_research",
+  "generated_at_utc": "2026-10-08T05:40:00Z",
+  "project": {"name": "AIQuantTradingSystem", "revision": "staged_after_df73516", "environment": "CPU; native threads=2; offline smoke"},
+  "scope": "圖文日誌、全候選交接、不同 R 模型退出提案及固定路徑浮動權益核對",
+  "overall_status": "WARN",
+  "summary": "工程流程通過；六個單輪小模型仍零合格成交，研究證據不足。未啟動正式訓練、SAC 或交易所交易。",
+  "changes": [
+    "RL 模擬帳戶逐棒耐久提交，部分 CSV 與日誌投影失敗可冪等恢復。",
+    "成交圖片、決策快照、R 定義及封存校驗；確認 fill 不冒充完整實盤往返。",
+    "全候選序列交接保存因果輸入、切分、重疊權重及分離標籤。",
+    "多 R 模型只產生品質閘門後的研究提案，不以未來收益選動作。",
+    "逐棒權益核對包含未實現損益，成本不重複扣除。"
+  ],
+  "findings": [
+    {"id": "MODEL-001", "severity": "HIGH", "status": "OPEN", "category": "research", "component": "Transformer/SAC",
+     "title": "小型煙霧模型未提供可交易性證據", "evidence": ["metrics.training_smoke", "docs/JOURNAL_RESEARCH_20261008.md"],
+     "impact": "零成交無法估計成交期望值，單輪訓練不能比較最佳 R 或授予 SAC 資格。",
+     "recommendation": "依預登記三種子、三時段配對矩陣研究；沒有可信改善就停止升級。"},
+    {"id": "LIVE-001", "severity": "MEDIUM", "status": "OPEN", "category": "execution_accounting", "component": "confirmed_fill",
+     "title": "實盤完整往返損益與 R 未驗證", "evidence": ["src/ai_quant_trading/live_trading/journal.py"],
+     "impact": "未知初始部位、佣金換匯、funding 和保護單會阻止完整損益歸屬。",
+     "recommendation": "只顯示確認成交；另以受控帳戶驗證完整對帳，不填入虛假 R。"}
+  ],
+  "checks": [
+    {"id": "PAPER-001", "name": "20 棒腳本模擬、圖片、冪等及成本核對", "status": "PASS", "evidence": ["scripts/smoke_trade_journal.py", "tests/paper_trading/test_transactions.py"]},
+    {"id": "DATA-001", "name": "候選交接與標籤隔離", "status": "PASS", "evidence": ["tests/research/test_candidate_handoff.py", "metrics.candidate_handoff"]},
+    {"id": "MODEL-001", "name": "六個單輪模型訓練至 Test 回放", "status": "PASS", "evidence": ["scripts/run_candidate_training_research.py", "metrics.training_smoke"]},
+    {"id": "MODEL-002", "name": "可部署成本後交易優勢", "status": "BLOCKED", "evidence": ["六組 basic/stress Transformer 雙閘門 Test 均零成交"]},
+    {"id": "ACCOUNT-001", "name": "91 筆固定成交逐棒浮動權益", "status": "PASS", "evidence": ["tests/research/test_account_replay.py", "metrics.account_replay"]},
+    {"id": "LIVE-001", "name": "實際交易所與完整往返驗收", "status": "BLOCKED", "evidence": ["本次僅離線 fixture，不使用憑證或連交易所"]}
+  ],
+  "metrics": {
+    "engineering": "PASS", "research_quality": "INSUFFICIENT_EVIDENCE", "live_eligible": false,
+    "paper_smoke": {"bars": 20, "orders": 13, "closed_rows": 8, "pngs": 13, "policy": "scripted_not_trained"},
+    "candidate_handoff": {"candidates": 1040, "train": 587, "calibration": 90, "selection": 90, "test": 269, "purged": 4},
+    "training_smoke": {
+      "seed": 42, "epochs_per_run": 1, "runs": 6, "elapsed_seconds_approx": 124.9,
+      "cpu_threads": 2, "sequence_length": 96, "d_model": 64, "layers": 2,
+      "feature_set": "compact_combined", "minimum_probability": 0.55, "minimum_net_edge_bps": 2,
+      "base_and_stress_test_trades_each_run": 0,
+      "records": [
+        {"reward_r": 1, "family": "original", "return_skill": -0.14106520823315383, "probability_skill": -0.016353248085573924},
+        {"reward_r": 1, "family": "trend_pullback", "return_skill": -0.08298878574876434, "probability_skill": -0.004492497614297708},
+        {"reward_r": 1, "family": "vwap_reversion", "return_skill": -0.07377622136186246, "probability_skill": 0.010481097439166143},
+        {"reward_r": 3, "family": "original", "return_skill": -0.1098093754496905, "probability_skill": -0.02388047811642746},
+        {"reward_r": 3, "family": "trend_pullback", "return_skill": -0.11116648613446123, "probability_skill": -0.04069318534371158},
+        {"reward_r": 3, "family": "vwap_reversion", "return_skill": -0.20135333008310385, "probability_skill": -0.03967999490463914}
+      ]
+    },
+    "exit_proposals": {"common_test_candidates": 269, "default_gate_proposals": 0, "diagnostic_only_proposals": 0, "deployment_connected": false},
+    "account_replay": {
+      "policy": "existing_no_ai_fixed_path_not_new_models", "trades": 91,
+      "research_initial_capital_usdt": 1000, "allocation": 0.1, "leverage": 1,
+      "total_return": -0.007513656621238596, "close_max_drawdown": 0.013489596053975483,
+      "adverse_drawdown_bound": 0.013534728858427214, "funding": "reserve_not_actual_history",
+      "liquidation_validated": false, "margin_tiers_validated": false, "tax_validated": false
+    },
+    "formal_training_started": false, "sac_started": false, "deployed_models_changed": false,
+    "next_minimal_plan": {"reward_r": 2, "families": 3, "feature_sets": 1, "losses": 2, "seeds": [42,137,2026], "walk_forward_folds": 3, "runs": 54, "executed": false}
+  },
+  "artifacts": [{"path": "docs/JOURNAL_RESEARCH_20261008.md", "role": "public_usage_and_limitations"}],
+  "residual_risks": [
+    "公開摘要不包含模型、私有成交、行情與圖像；不能取代本機完整證據備份。",
+    "單 seed、單 epoch 只驗證工程；沒有跨 seed 分散程度或完整向前優勢。",
+    "歷史已反覆研究，合法時間 OOS 不等於全新 final holdout。",
+    "OHLC 棒內不利界線不等於實際逐筆路徑；未驗證清算、保證金、真實 funding 或稅後績效。",
+    "封存和圖文不構成完整即時交易驗收或零漏洞證明。"
+  ],
+  "next_actions": [
+    "先執行固定 2R、compact_combined、MSE/Smooth L1 的三種子三時段配對研究。",
+    "資料／契約／成本核對失敗即停；排序、校準或成本壓力未改善則不進 SAC。",
+    "如研究多 R，預先固定比較方案及相同合法 OOS，不以 Test 最佳收益選 R。"
+  ]
+}

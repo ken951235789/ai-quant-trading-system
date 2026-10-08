@@ -174,3 +174,46 @@ def test_packaging_validation_rejects_secret_inside_dist(
 
     with pytest.raises(RuntimeError, match="不可包含 .env"):
         builder._validate_runtime_data()
+
+
+def test_program_update_preserves_runtime_and_old_binary(tmp_path, monkeypatch):
+    dist=tmp_path/'dist/AIQuantTradingSystem'
+    staged=tmp_path/'build/new'
+    backup=tmp_path/'backup'
+    for root,text in [(dist,'old'),(staged,'new')]:
+        (root/'_internal').mkdir(parents=True)
+        (root/'AIQuantTradingSystem.exe').write_text(text)
+        (root/'_internal/core.dll').write_text(text)
+    for relative in ['data/account.json','configs/risk.json','logs/trade.log','.streamlit/config.toml']:
+        path=dist/relative
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text('keep')
+    monkeypatch.setattr(builder,'PROJECT_ROOT',tmp_path)
+    monkeypatch.setattr(builder,'DIST_DIR',dist)
+    builder.install_program_update(staged,dist,backup)
+    assert (dist/'AIQuantTradingSystem.exe').read_text()=='new'
+    assert (backup/'AIQuantTradingSystem.exe').read_text()=='old'
+    for relative in ['data/account.json','configs/risk.json','logs/trade.log','.streamlit/config.toml']:
+        assert (dist/relative).read_text()=='keep'
+
+
+def test_program_update_rolls_back_on_failure(tmp_path, monkeypatch):
+    from pathlib import Path
+    dist=tmp_path/'dist/AIQuantTradingSystem'
+    staged=tmp_path/'build/new'
+    for root,text in [(dist,'old'),(staged,'new')]:
+        (root/'_internal').mkdir(parents=True)
+        (root/'AIQuantTradingSystem.exe').write_text(text)
+    monkeypatch.setattr(builder,'PROJECT_ROOT',tmp_path)
+    monkeypatch.setattr(builder,'DIST_DIR',dist)
+    original=Path.rename
+    def rename(path,target):
+        if path==staged/'_internal':
+            raise PermissionError('injected lock')
+        return original(path,target)
+    monkeypatch.setattr(Path,'rename',rename)
+    with pytest.raises(PermissionError):
+        builder.install_program_update(staged,dist,tmp_path/'backup')
+    assert (dist/'AIQuantTradingSystem.exe').read_text()=='old'
+    assert (dist/'_internal').exists()
+    assert (staged/'AIQuantTradingSystem.exe').read_text()=='new'

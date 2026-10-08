@@ -220,6 +220,22 @@ class PostgresTradingRepository:
                     session.add(ExchangeEvent(**values))
         return inserted, event_key
 
+    def journal_exchange_events(self, environment: str, *, after_id: int = 0, limit: int = 200):
+        """唯讀擷取已保存的成交事件；日誌失敗不影響既有訂單投影。"""
+        from sqlalchemy import select
+        from ai_quant_trading.database.models import ExchangeEvent
+        if not 1 <= limit <= 1000 or after_id < 0:
+            raise ValueError("日誌事件分頁範圍不合法")
+        with self._session_factory() as session:
+            rows = session.scalars(select(ExchangeEvent).where(
+                ExchangeEvent.environment == environment,
+                ExchangeEvent.event_type == "ORDER_TRADE_UPDATE",
+                ExchangeEvent.id > after_id).order_by(ExchangeEvent.id).limit(limit))
+            # 僅交付已知成交欄位，不把完整私有事件交給圖文輸出。
+            keys = ("x", "l", "L", "t", "T", "s", "S", "ps", "n", "N", "rp", "R")
+            return [{"id": row.id, "payload": {"e": row.event_type, "T": row.payload.get("T"),
+                "o": {key: row.payload.get("o", {}).get(key) for key in keys if key in row.payload.get("o", {})}}} for row in rows]
+
     def project_exchange_event(self, event_key: str) -> bool:
         """把已保存事件投影成訂單與成交；失敗會保留原始事件供重播。"""
         from sqlalchemy import select

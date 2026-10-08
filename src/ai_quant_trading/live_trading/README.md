@@ -155,3 +155,11 @@ python scripts\run_live_safety_drills.py
 
 報告會寫入 `data/research/live_safety_drills/<UTC時間>/report.json`。離線通過只證明本機
 控制流程可運作，不能取代真實 API Key 的 Testnet 長時間驗收。
+
+## 確認成交圖文
+
+`journal.py` 在既有 RL 無人週期讀取 PostgreSQL 保存的交易所成交事件，僅投影
+`ORDER_TRADE_UPDATE / TRADE`。同環境、商品與 trade ID 重播不重複產圖；未知初始
+部位不推定開平倉，未知 funding/佣金換匯不冒充完整净收益。UI 位於監控的訂單頁。
+此模組不呼叫交易 API、不讀取秘密檔；本機 fixture 通過不等於真實交易驗收。
+詳見 `docs/JOURNAL_RESEARCH_20261008.md`。

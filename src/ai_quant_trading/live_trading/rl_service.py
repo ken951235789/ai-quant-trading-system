@@ -455,6 +455,9 @@ def run_live_rl_cycle(
         take_profit_distance=account.take_profit_distance,
     )
     current = prepared_market.iloc[-1]
+    if isinstance(gateway, FuturesTradingGateway):
+        from ai_quant_trading.live_trading.journal import cache_live_market
+        cache_live_market(live_trading_paths(storage_root, gateway.config.environment), prepared_market)
     governed_target, governance = govern_model_target(
         proposed_target=target.target_fraction,
         current_position=position,

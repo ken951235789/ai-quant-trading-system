@@ -192,6 +192,9 @@ def load_account_state(paths: PaperAccountPaths) -> PaperAccountState:
 
 def append_csv_row(path: Path, columns: list[str], row: dict[str, object]) -> None:
     """依固定欄位追加一筆 UTF-8 CSV。"""
+    from ai_quant_trading.paper_trading.transactions import capture_csv
+    if capture_csv(path, columns, row):
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     has_content = path.exists() and path.stat().st_size > 0
     if has_content:

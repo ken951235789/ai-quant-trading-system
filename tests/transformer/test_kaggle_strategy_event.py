@@ -110,10 +110,10 @@ def test_candidate_bundle_keeps_flow_but_excludes_private_columns(tmp_path):
     assert "taker_buy_base_volume" in data
     assert (package / "src/ai_quant_trading/research/candidate_evaluation.py").exists()
     assert (package / "scripts/run_candidate_training_research.py").exists()
-    plan = json.loads((package / "execution_plan.json").read_text())
+    plan = json.loads((package / "execution_plan.json").read_text(encoding="utf-8"))
     assert plan["planned_runs"] == 18 and plan["seeds"] == [42, 137, 2026]
     assert plan["variants"] == ["F_existing", "F_compact_combined"]
-    metadata = json.loads((output / "kernel/kernel-metadata.json").read_text())
+    metadata = json.loads((output / "kernel/kernel-metadata.json").read_text(encoding="utf-8"))
     assert metadata["is_private"] and not metadata["enable_internet"]
 
 

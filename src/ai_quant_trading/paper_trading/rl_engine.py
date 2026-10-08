@@ -30,6 +30,7 @@ from ai_quant_trading.paper_trading.engine import (
     _validate_account_source,
 )
 from ai_quant_trading.paper_trading.state import PaperAccountState
+from ai_quant_trading.paper_trading.transactions import recoverable_cycle, bar_transaction
 from ai_quant_trading.paper_trading.storage import (
     account_paths,
     list_paper_accounts,
@@ -446,6 +447,7 @@ def _paper_portfolio_exposures(
     return exposures
 
 
+@recoverable_cycle
 def run_rl_paper_cycle(
     frame: pd.DataFrame,
     policy: LoadedRLPolicy,
@@ -529,6 +531,8 @@ def run_rl_paper_cycle(
     if state.last_processed_timestamp is not None:
         newer = market.loc[market["timestamp"] > pd.Timestamp(state.last_processed_timestamp)]
         if newer.empty:
+            from ai_quant_trading.trading.journal import journal_call
+            journal_call(paths, "render_pending", limit=4)
             return PaperCycleResult(
                 state,
                 paths,
@@ -727,6 +731,7 @@ def run_rl_paper_cycle(
                 signal = -1
             return pd.Series(
                 {
+                    "journal_input_snapshot": target.input_snapshot,
                     "action_signal": signal,
                     "target_fraction": approved,
                     "finbert_sentiment": current.get("finbert_sentiment", 0.0),
@@ -754,15 +759,19 @@ def run_rl_paper_cycle(
                 }
             )
 
-        executed_signal, policy_signal, target_fraction = _process_bar(
-            state,
-            row,
-            None,
-            paths,
-            execute_pending=not initialized or sequence > 0,
-            prediction_provider=prediction_provider,
-        )
+        with bar_transaction(paths, state):
+            executed_signal, policy_signal, target_fraction = _process_bar(
+                state,
+                row,
+                None,
+                paths,
+                execute_pending=not initialized or sequence > 0,
+                prediction_provider=prediction_provider,
+            )
     save_account_state(paths, state)
+    # 所有帳務與持倉先落盤，再處理可重試的圖表副本。
+    from ai_quant_trading.trading.journal import journal_call
+    journal_call(paths, "render_pending", limit=4)
     message = "RL 模擬帳戶已初始化，目標持倉會在下一根 K 線開盤執行。"
     if not initialized:
         message = f"已依序處理 {len(newer)} 根新 K 線並保存 RL 模擬帳戶。"

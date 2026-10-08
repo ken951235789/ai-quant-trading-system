@@ -94,13 +94,15 @@ def research_plan(seeds, feature_study=False):
     return value
 
 
-def configurations(payload, family, variant, seed, window, smoke=False):
+def configurations(payload, family, variant, seed, window, smoke=False, reward_r=2.0):
+    paired_loss = variant.endswith("_smooth_l1") and variant.removesuffix("_smooth_l1") in FEATURE_VARIANTS
+    base_variant = variant.removesuffix("_smooth_l1") if paired_loss else variant
     feature_ablation = "without_cost" if variant == "D_context_mse_without_cost" else "none"
-    feature_set = FEATURE_VARIANTS.get(variant, "existing")
-    profile, loss = ("context_v2", "mse") if variant in FEATURE_VARIANTS else VARIANTS[
+    feature_set = FEATURE_VARIANTS.get(base_variant, "existing")
+    profile, loss = ("context_v2", "smooth_l1" if paired_loss else "mse") if base_variant in FEATURE_VARIANTS else VARIANTS[
         "D_context_mse" if feature_ablation != "none" else variant]
     contract = CandidateContract(family=family, feature_profile=profile, feature_ablation=feature_ablation,
-        feature_set=feature_set,
+        feature_set=feature_set, reward_r=reward_r,
         regime_exit={"original": "loss", "trend_pullback": "opposite", "vwap_reversion": "disabled"}[family])
     model = TemporalTransformerConfig(**payload["model"])
     training = TransformerTrainingConfig(**payload["training"])
@@ -149,7 +151,7 @@ def evaluate_run(result, source, contract, model, training):
         np.testing.assert_allclose(predictions[f"actual_return_{h}"], aligned.net_return, rtol=1e-5, atol=1e-8)
         comparisons[split] = {
             "policies": compare_execution_policies(frame, predictions, fitted, contract, sha(source),
-                training.economic_minimum_edge_bps, result.run_dir / f"{split}_policies"),
+                training.economic_minimum_edge_bps, result.run_dir / f"{split}_policies", gate_ablation=True),
             "prediction_diagnostics": score_diagnostics(predictions, h, edges)}
     value = {"contract": data.diagnostics["candidate_contract"], "calibration_protocol": protocol,
         "samples": {**data.sample_counts, "calibration": len(calibration), "selection": len(selection)},
@@ -171,8 +173,15 @@ def paired_summary(records):
     for record in records:
         key = (record["family"], record["fold"], record["seed"])
         grouped.setdefault(key, {})[record["variant"]] = record
-    effects, feature_effects = [], []
+    effects, feature_effects, loss_effects = [], [], []
     for key, variants in grouped.items():
+        for name in FEATURE_VARIANTS:
+            if name in variants and name + "_smooth_l1" in variants:
+                for metric in ("event_return_skill", "event_probability_skill", "event_prediction_skill_score"):
+                    loss_effects.append({"family": key[0], "fold": key[1], "seed": key[2],
+                        "feature_variant": name, "metric": metric,
+                        "mse_minus_smooth_l1": variants[name]["test_prediction_metrics"][metric]
+                            - variants[name + "_smooth_l1"]["test_prediction_metrics"][metric]})
         if set(FEATURE_VARIANTS).issubset(variants):
             for metric in ("event_return_skill", "event_probability_skill", "event_prediction_skill_score"):
                 old, compact, flow, setup, combined = [variants[v]["test_prediction_metrics"][metric]
@@ -189,6 +198,7 @@ def paired_summary(records):
                 "context_effect": ((c - a) + (d - b)) / 2,
                 "mse_effect": ((b - a) + (d - c)) / 2, "interaction": d - c - b + a})
     return {"factorial_effects": effects, "complete_pairs": len(effects) // 3,
+            "paired_loss_effects": loss_effects,
             "feature_effects": feature_effects, "complete_feature_pairs": len(feature_effects) // 3,
             "selection": "no_test_winner_or_deployment", "scope": "seed/fold 非獨立；效果是預測 skill 差，不是獲利證據"}
 
@@ -224,7 +234,10 @@ def main(argv=None):
     parser.add_argument("--config", type=Path, default=ROOT / "configs/transformer_strategy_event_v2.example.json")
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 137, 2026])
     parser.add_argument("--smoke-rows", type=int, default=48000)
-    parser.add_argument("--feature-study", action="store_true", help="五組新特徵配對研究，固定 MSE")
+    parser.add_argument("--feature-study", action="store_true", help="五組新特徵研究，預設 MSE，可另加 paired-loss")
+    parser.add_argument("--paired-loss", action="store_true", help="同一特徵、種子與時段額外配對 Smooth L1；不擴大模型")
+    parser.add_argument("--reward-r", type=float, choices=[1.0, 2.0, 3.0], default=2.0,
+                        help="獨立退出研究的固定停利 R；重新產生契約和標籤，不沿用舊分數")
     parser.add_argument("--flow-source", type=Path, help="本機完整成交欄位 CSV；逐根比對 OHLCV 後補入")
     parser.add_argument("--variants", nargs="+", choices=list(FEATURE_VARIANTS), help="事先限定新特徵比較組，不依結果追加")
     parser.add_argument("--folds", type=int, nargs="+", choices=[1, 2, 3], help="事先限定向前時段；未指定則三段")
@@ -232,6 +245,10 @@ def main(argv=None):
     mode.add_argument("--smoke", action="store_true")
     mode.add_argument("--run-research", action="store_true", help="明確啟動完整矩陣，可能長時間運算")
     args = parser.parse_args(argv)
+    if args.paired_loss and not args.feature_study:
+        raise ValueError("paired-loss 只支援明確的新特徵配對研究")
+    if args.reward_r != 2.0 and args.paired_loss:
+        raise ValueError("退出研究與損失消融應分開，不同時變更")
     if args.variants and (not args.feature_study or len(set(args.variants)) != len(args.variants)):
         raise ValueError("variants 僅供新特徵研究且不得重複")
     if args.folds and len(set(args.folds)) != len(args.folds):
@@ -265,6 +282,14 @@ def main(argv=None):
         variant_count = len(args.variants or FEATURE_VARIANTS) if args.feature_study else len(VARIANTS) + 1
         plan["formal_runs"] = len(args.seeds) * len(FAMILIES) * variant_count * len(all_windows)
         plan["limited_matrix"] = "事前限制；單一時段不能冒充完整三段向前驗證"
+    plan.update(gate_ablation=["none", "probability", "return", "both"], reward_r=args.reward_r,
+                paired_loss=args.paired_loss, dynamic_exit_enabled=False)
+    plan["selection"] = f"不依舊 Forward 排名挑選；共同 stop=2ATR,R={args.reward_r:g},hold=32,cooldown=4,strict=false"
+    if args.paired_loss:
+        plan["variants"] = [v for name in plan["variants"] for v in (name, name + "_smooth_l1")]
+        plan["formal_runs"] *= 2
+        plan["feature_group_ablation"] = "同一特徵群與 seed，配對 MSE / Smooth L1"
+        plan["unchanged"] = "同來源/候選/標籤/成本/門檻/切分/小型V3；特徵與損失採配對比較"
     raw = raw.iloc[:int(len(raw) * .9)].copy()
     plan.update(source=str(args.source.resolve()), source_sha256=source_sha,
         observed_source_end=observed_source_end,
@@ -288,6 +313,13 @@ def main(argv=None):
         windows = all_windows
         variants = args.variants or (list(FEATURE_VARIANTS) if args.feature_study else list(VARIANTS) + ["D_context_mse_without_cost"])
         seeds = args.seeds
+    if args.paired_loss:
+        variants = [v for name in variants for v in (name, name + "_smooth_l1")]
+    plan["executed_windows"] = windows
+    plan["executed_seeds"] = seeds
+    plan["executed_variants"] = variants
+    plan["executed_runs"] = len(windows) * len(seeds) * len(variants) * len(FAMILIES)
+    write_json(args.output / "plan.json", plan)
     records, failures = [], []
     write_json(args.output / "progress.json", {"status": "running", "completed": 0})
     for window in windows:
@@ -297,7 +329,7 @@ def main(argv=None):
             for variant in variants:
                 for seed in seeds:
                     name = f"f{window['fold']}_{family}_{variant}_s{seed}"
-                    contract, model, training = configurations(payload, family, variant, seed, window, args.smoke)
+                    contract, model, training = configurations(payload, family, variant, seed, window, args.smoke, args.reward_r)
                     print(f"開始 {name}", flush=True)
                     try:
                         run_started = monotonic()

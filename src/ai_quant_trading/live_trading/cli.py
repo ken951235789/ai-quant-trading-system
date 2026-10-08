@@ -360,6 +360,8 @@ def _rl_auto(args: argparse.Namespace) -> int:
             raise RuntimeError("Binance 私有事件流在 20 秒內未完成連線")
     def guarded_cycle():
         if reconcile is not None:
+            from ai_quant_trading.live_trading.journal import sync_confirmed_fills
+            sync_confirmed_fills(repository, paths, args.environment)
             checkpoint = repository.stream_checkpoint(args.environment, "usd_m_user_data")
             heartbeat = checkpoint.get("heartbeat_at") if checkpoint else None
             if isinstance(heartbeat, str):
@@ -393,7 +395,11 @@ def _rl_auto(args: argparse.Namespace) -> int:
                     "warning",
                     f"FinBERT 新聞更新失敗，暫用既有資料：{news_status.get('message', '')}",
                 )
-        return _rl_cycle_once(args, policy, gateway)
+        try:
+            return _rl_cycle_once(args, policy, gateway)
+        finally:
+            if reconcile is not None:
+                sync_confirmed_fills(repository, paths, args.environment)
 
     try:
         final_status = run_automation(

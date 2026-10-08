@@ -66,7 +66,7 @@ def score_diagnostics(predictions, horizon, edges):
 
 
 def compare_execution_policies(frame, predictions, fitted, contract, source_sha256,
-                               minimum_edge_bps, output_dir):
+                               minimum_edge_bps, output_dir, *, gate_ablation=False):
     """零、基本與壓力成本各自重播；訊號分數凍結，重新排程持倉與冷卻。"""
     output_dir.mkdir(parents=True, exist_ok=False)
     horizon = contract.holding_bars
@@ -85,14 +85,18 @@ def compare_execution_policies(frame, predictions, fitted, contract, source_sha2
             current[f"event_{field}"] = available[field].to_numpy()
         policies = {"no_ai": current, "statistical": apply_statistical_filter(current, fitted, horizon),
                     "transformer": current}
+        if gate_ablation:
+            policies.update(transformer_probability=current, transformer_return=current)
         for policy, values in policies.items():
+            mode = {"transformer_probability": "probability", "transformer_return": "return"}.get(policy)
             selected, reasons = select_event_trades(values, horizon, scenario.event_config(),
-                minimum_edge_bps, filtered=policy != "no_ai")
+                minimum_edge_bps, filtered=policy != "no_ai", filter_mode=mode)
             trades = attributed.set_index("endpoint", drop=False).loc[selected.endpoint.astype(int)].copy()
             trades.to_csv(output_dir / f"{policy}_{name}_trades.csv", index=False)
             summary = attribution_summary(trades)
             returns = trades.net_return.to_numpy()
-            ci = block_confidence_interval(returns) if len(returns) >= 2 else (None, None)
+            # 少量成交的區塊抽樣容易退化；八筆也只是描述區間的最低計算量。
+            ci = block_confidence_interval(returns) if len(returns) >= 8 else (None, None)
             summary.update(ci_low=ci[0], ci_high=ci[1], rejections=reasons,
                 scenario=name, policy=policy, assumption="market_orders_no_maker_fill_claim",
                 account_equity_validated=False)

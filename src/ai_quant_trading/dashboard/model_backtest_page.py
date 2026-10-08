@@ -638,11 +638,15 @@ def render_model_backtest_page(
         st.warning(f"{activity.label}正在執行，模型回測暫時鎖定。")
     model_kind = st.segmented_control(
         "回測模型",
-        ["PPO／SAC 模型", "Transformer 模型"],
+        ["PPO／SAC 模型", "Transformer 模型", "逐筆進出場"],
         default="PPO／SAC 模型",
         width="stretch",
     )
-    if model_kind == "PPO／SAC 模型":
+    if model_kind == "逐筆進出場":
+        from ai_quant_trading.dashboard.trade_review_page import render_trade_review_page
+
+        render_trade_review_page(project_root, dark_mode)
+    elif model_kind == "PPO／SAC 模型":
         _render_ppo(rl_dir, output_dir, dark_mode, activity is not None)
     else:
         _render_transformer(

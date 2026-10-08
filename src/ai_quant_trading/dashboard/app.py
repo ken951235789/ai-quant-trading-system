@@ -647,6 +647,14 @@ def _render_startup_refresh_sidebar() -> None:
 
 def _render_sidebar() -> str:
     st.sidebar.subheader("AI Quant")
+    from ai_quant_trading.dashboard.runtime import get_bundled_resource
+
+    build_info = get_bundled_resource("app/build_info.json")
+    if build_info.is_file():
+        try:
+            st.sidebar.caption(f"桌面版 {json.loads(build_info.read_text(encoding='utf-8'))['build_id']}")
+        except (OSError, ValueError, KeyError):
+            st.sidebar.caption("桌面版版本資訊無法讀取")
     st.sidebar.toggle(
         "深色模式",
         key="dark_mode",

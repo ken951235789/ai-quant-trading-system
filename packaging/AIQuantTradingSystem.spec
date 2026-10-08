@@ -2,6 +2,7 @@
 """AI Quant Trading System 的 PyInstaller one-folder 建置規格。"""
 
 from pathlib import Path
+import os
 
 from PyInstaller.utils.hooks import (
     collect_data_files,
@@ -14,7 +15,12 @@ from PyInstaller.utils.hooks import (
 PROJECT_ROOT = Path(SPECPATH).resolve().parent
 datas = [
     (str(PROJECT_ROOT / "packaging" / "streamlit_entry.py"), "app"),
+    (str(PROJECT_ROOT / "src/ai_quant_trading/research/trade_review.html"), "ai_quant_trading/research"),
 ]
+if os.environ.get("AI_QUANT_BUILD_INFO"):
+    build_info = Path(os.environ["AI_QUANT_BUILD_INFO"]).resolve()
+    build_info.relative_to(PROJECT_ROOT)
+    datas.append((str(build_info), "app"))
 binaries = []
 hiddenimports = collect_submodules("ai_quant_trading")
 hiddenimports += collect_submodules("streamlit.runtime")
@@ -30,6 +36,7 @@ hiddenimports += collect_submodules("sqlalchemy")
 hiddenimports += collect_submodules("psycopg")
 hiddenimports += collect_submodules("alembic")
 hiddenimports += [
+    "matplotlib.backends.backend_agg",
     "transformers.models.auto.configuration_auto",
     "transformers.models.auto.modeling_auto",
     "transformers.models.auto.tokenization_auto",
@@ -83,7 +90,7 @@ a = Analysis(
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
-    hooksconfig={},
+    hooksconfig={"matplotlib": {"backends": ["Agg"]}},
     runtime_hooks=[],
     excludes=[
         "cv2",

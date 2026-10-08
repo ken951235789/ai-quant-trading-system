@@ -590,12 +590,15 @@ def _render_paper_monitor(
         orders = read_account_csv(paths.orders_csv, ORDER_COLUMNS)
         activity_kind = st.segmented_control(
             "紀錄",
-            ["成交", "訂單"],
+            ["成交", "訂單", "圖文日誌"],
             default="成交",
             key="robot_monitor_activity_kind",
         )
         activity = trades if activity_kind == "成交" else orders
-        if activity.empty:
+        if activity_kind == "圖文日誌":
+            from ai_quant_trading.dashboard.trade_journal_page import render_trade_journal
+            render_trade_journal(paths.account_dir / "trade_journal")
+        elif activity.empty:
             st.info("目前沒有交易紀錄。")
         else:
             themed_dataframe(
@@ -834,6 +837,9 @@ def _render_live_monitor(
                 key=themed_widget_key("live_robot_positions"),
             )
     with orders_tab:
+        from ai_quant_trading.dashboard.trade_journal_page import render_trade_journal
+        with st.expander("交易所成交圖文"):
+            render_trade_journal(paths.environment_dir / "trade_journal")
         orders = read_live_csv(paths.orders_csv, LIVE_ORDER_COLUMNS, limit=100)
         if orders.empty:
             st.info("目前沒有實盤訂單。")

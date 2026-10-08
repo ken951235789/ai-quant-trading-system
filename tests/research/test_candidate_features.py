@@ -220,3 +220,28 @@ def test_preregistered_limited_matrix_plan(tmp_path):
     assert plan["formal_runs"] == 18 and plan["full_matrix_runs"] == 135
     assert plan["selected_folds"] == [3]
     assert plan["mode"] == "plan" and not plan["live_eligible"]
+
+
+def test_paired_loss_and_exit_contracts_are_separate(tmp_path):
+    module = runner()
+    payload = json.loads((ROOT / "configs/transformer_strategy_event_v2.example.json").read_text())
+    window = {"source_end": 10000, "train_end": 6000, "validation_end": 8000}
+    old, model, mse = module.configurations(payload, "original", "F_compact_combined", 42, window, True)
+    paired, same_model, smooth = module.configurations(payload, "original", "F_compact_combined_smooth_l1", 42, window, True)
+    assert old == paired and model == same_model
+    assert mse.return_loss_kind == "mse" and smooth.return_loss_kind == "smooth_l1"
+    different, _, _ = module.configurations(payload, "original", "F_compact_combined", 42, window, True, 1.0)
+    assert different.digest != old.digest
+    assert different.event_config().target_atr == 2.
+    source = tmp_path / "bars.csv"
+    bars(20000).to_csv(source, index=False)
+    output = tmp_path / "paired_plan"
+    assert module.main(["--source", str(source), "--output", str(output), "--feature-study",
+        "--variants", "F_existing", "F_compact_combined", "--folds", "3", "--paired-loss"]) == 0
+    plan = json.loads((output / "plan.json").read_text(encoding="utf-8"))
+    assert plan["formal_runs"] == 36 and plan["paired_loss"]
+    assert "Smooth L1" in plan["feature_group_ablation"]
+    assert plan["reward_r"] == 2 and not plan["dynamic_exit_enabled"]
+    with pytest.raises(ValueError, match="分開"):
+        module.main(["--source", str(source), "--output", str(output), "--feature-study",
+                     "--paired-loss", "--reward-r", "1"])

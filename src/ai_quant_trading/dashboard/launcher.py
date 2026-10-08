@@ -393,6 +393,7 @@ def _show_startup_error(message: str) -> None:
 def _parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--streamlit-server", action="store_true")
+    parser.add_argument("--self-check", action="store_true")
     parser.add_argument("--paper-auto-worker", action="store_true")
     parser.add_argument("--live-auto-worker", action="store_true")
     parser.add_argument("--startup-refresh-worker", action="store_true")
@@ -500,6 +501,8 @@ def main(arguments: list[str] | None = None) -> int:
     root = get_runtime_root()
     options = _parse_arguments(arguments)
     try:
+        if options.self_check:
+            return _run_package_self_check(root)
         if options.streamlit_server:
             if options.port is None:
                 raise ValueError("背景服務缺少 --port")
@@ -528,6 +531,7 @@ def main(arguments: list[str] | None = None) -> int:
         logging.exception("AI Quant Trading System 啟動失敗")
         if not (
             options.streamlit_server
+            or options.self_check
             or options.paper_auto_worker
             or options.live_auto_worker
             or options.startup_refresh_worker
@@ -536,6 +540,47 @@ def main(arguments: list[str] | None = None) -> int:
         ):
             _show_startup_error(f"啟動失敗：{exc}\n\n請查看 logs\\launcher.log")
         return 1
+
+
+def _run_package_self_check(root: Path) -> int:
+    """離線封裝健檢，不讀秘密檔、不啟動更新、交易或網路背景服務。"""
+    _configure_current_process_threads()
+    from ai_quant_trading.dashboard.trade_review_page import make_trade_review_figure
+    from ai_quant_trading.research.trade_review_bundle import FILENAME, load_review_bundle
+    from ai_quant_trading.live_trading.journal import project_confirmed_fill
+    from ai_quant_trading.trading.journal import TradeJournal
+    from ai_quant_trading.trading.journal_archive import archive_journal, read_asset
+    from tempfile import TemporaryDirectory
+
+    # 使用本地合成成交，實際檢查圖片與封存依賴，不觸碰使用者帳戶。
+    with TemporaryDirectory(prefix="aiquant-selfcheck-") as temporary:
+        journal = TradeJournal(Path(temporary))
+        project_confirmed_fill(journal, "offline_fixture", {"e": "ORDER_TRADE_UPDATE", "T": 1767225600000,
+            "o": {"x": "TRADE", "s": "BTCUSDT", "t": 1, "S": "BUY", "l": ".01", "L": "90000", "n": ".45", "N": "USDT", "rp": "0"}})
+        if journal.render_pending() != 1:
+            raise RuntimeError("封裝日誌繪圖驗證失敗")
+        record_id = journal.records()[0]["id"]
+        archive_journal(journal, keep_recent=0, prune=True)
+        if not read_asset(journal.root, record_id).startswith(b"\x89PNG"):
+            raise RuntimeError("封裝日誌封存驗證失敗")
+
+    packages = sorted((root/"data/processed/research_reviews").glob(f"*/{FILENAME}"))
+    checked = 0
+    for package in packages:
+        payload = load_review_bundle(package.parent)["payload"]
+        trade = next(t for schedule in payload["schedules"] for t in schedule)
+        for dark_mode in (False, True):
+            figure = make_trade_review_figure(payload, trade, dark_mode=dark_mode)
+            figure.to_json()
+        checked += 1
+    info = get_bundled_resource("app/build_info.json")
+    result = {"engineering": "PASS", "frozen": is_frozen_app(), "bundles_checked": checked,
+              "build_id": json.loads(info.read_text(encoding="utf-8"))["build_id"] if info.is_file() else "source",
+              "network_started": False, "trading_started": False, "journal_png_archive": "PASS"}
+    logs = root/"logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs/"package-self-check.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    return 0
 
 
 if __name__ == "__main__":

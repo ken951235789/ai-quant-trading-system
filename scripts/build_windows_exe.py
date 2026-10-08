@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import argparse
+import json
 from pathlib import Path
 import os
 import shutil
@@ -268,8 +270,17 @@ def _validate_runtime_data() -> None:
 
 def main() -> int:
     """呼叫 PyInstaller，完成後補上資料與中文說明。"""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--program-only", action="store_true")
+    parser.add_argument("--build-root", type=Path)
+    options = parser.parse_args()
     if not _validate_packaging_python() or not _validate_packaging_openssl():
         return 1
+
+    if options.program_only:
+        if options.build_root is None:
+            raise ValueError("程式更新模式必須指定新的 --build-root")
+        return build_program_only(options.build_root)
 
     try:
         import PyInstaller  # noqa: F401
@@ -319,6 +330,85 @@ def main() -> int:
         raise FileNotFoundError(f"建置完成但找不到 EXE：{executable}")
     print(f"Windows App：{executable}")
     return 0
+
+
+def build_program_only(build_root: Path) -> int:
+    """在獨立目錄建置，不執行舊版資料複製、刪除或設定合併。"""
+    from ai_quant_trading.operations.integrity import sha256_file
+    # 圖文日誌是桌面功能，不可等到漫長建置完成後才發現依賴不存在。
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        from matplotlib.backends.backend_agg import FigureCanvasAgg  # noqa: F401
+    except ImportError as error:
+        raise RuntimeError('打包環境缺少 Matplotlib，請先安裝專案 dashboard 依賴') from error
+
+    root = build_root.resolve()
+    root.relative_to(PROJECT_ROOT.resolve())
+    if root.exists():
+        raise FileExistsError("建置目錄已存在，拒絕覆写")
+    root.mkdir(parents=True)
+    sources = [*sorted((PROJECT_ROOT/"src").rglob("*.py")), SPEC_PATH]
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, text=True).strip()
+    info = {"build_id": datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-trade-review",
+            "revision": revision, "working_tree_snapshot": True,
+            "python": sys.version.split()[0], "research_only_changes": True,
+            "source_sha256": {p.relative_to(PROJECT_ROOT).as_posix(): sha256_file(p) for p in sources}}
+    info_path = root / "build_info.json"
+    info_path.write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8")
+    environment = dict(os.environ)
+    environment["AI_QUANT_BUILD_INFO"] = str(info_path)
+    for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+        environment[name] = "2"
+    command = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean",
+               "--distpath", str(root/"dist"), "--workpath", str(root/"work"), str(SPEC_PATH)]
+    with (root/"build.log").open("w", encoding="utf-8") as log:
+        subprocess.run(command, cwd=PROJECT_ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT, check=True)
+    for relative, digest in info["source_sha256"].items():
+        if sha256_file(PROJECT_ROOT/relative) != digest:
+            raise RuntimeError("建置期間原始碼變動，請重新建置")
+    staged = root / "dist" / "AIQuantTradingSystem"
+    if not (staged/"AIQuantTradingSystem.exe").is_file():
+        raise FileNotFoundError("找不到新 EXE")
+    print(f"程式建置完成，尚未替換使用者資料：{staged}")
+    return 0
+
+
+def install_program_update(staged: Path, destination: Path, backup: Path) -> None:
+    """只交換 EXE 與依賴；保留舊程式可回滾，完全不碰 data/configs/logs。"""
+    staged, destination, backup = staged.resolve(), destination.resolve(), backup.resolve()
+    base = PROJECT_ROOT.resolve()
+    for path in (staged, destination, backup):
+        path.relative_to(base)
+    if destination != DIST_DIR.resolve() or backup.exists():
+        raise ValueError("更新目的地或備份目錄不合法")
+    if staged.is_relative_to(destination) or backup.is_relative_to(destination):
+        raise ValueError("暫存與備份不得位於正式程式目錄內")
+    names = ("AIQuantTradingSystem.exe", "_internal")
+    for name in names:
+        source = staged/name
+        if not source.exists() or source.is_symlink() or not source.resolve().is_relative_to(staged):
+            raise ValueError("新程式檔案不完整或超出建置範圍")
+        old = destination/name
+        if old.is_symlink() or not old.resolve().is_relative_to(destination):
+            raise ValueError("舊程式路徑超出更新範圍")
+    backup.mkdir(parents=True)
+    destination.mkdir(parents=True, exist_ok=True)
+    moved_old, moved_new = [], []
+    try:
+        for name in names:
+            if (destination/name).exists():
+                (destination/name).rename(backup/name)
+                moved_old.append(name)
+        for name in names:
+            (staged/name).rename(destination/name)
+            moved_new.append(name)
+    except OSError:
+        for name in reversed(moved_new):
+            (destination/name).rename(staged/name)
+        for name in reversed(moved_old):
+            (backup/name).rename(destination/name)
+        raise
 
 
 if __name__ == "__main__":

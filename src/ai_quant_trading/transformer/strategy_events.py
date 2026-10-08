@@ -279,8 +279,11 @@ def build_event_outcomes(frame: pd.DataFrame, config: StrategyEventConfig, *,
 
 def select_event_trades(predictions: pd.DataFrame, horizon: int,
                         config: StrategyEventConfig, minimum_edge_bps: float, *,
-                        filtered: bool) -> tuple[pd.DataFrame, dict[str, int]]:
+                        filtered: bool, filter_mode: str | None = None) -> tuple[pd.DataFrame, dict[str, int]]:
     """共用不重疊成交與拒絕原因；進場判斷不使用候選的未來收益。"""
+    mode = filter_mode if filter_mode is not None else ("both" if filtered else "none")
+    if mode not in {"none", "probability", "return", "both"}:
+        raise ValueError("未登記的事件篩選模式")
     required = ["series_index", "endpoint", "event_exit_endpoint",
                 f"tradeability_probability_{horizon}", f"predicted_return_{horizon}",
                 f"actual_return_{horizon}"]
@@ -302,9 +305,9 @@ def select_event_trades(predictions: pd.DataFrame, horizon: int,
             if row["endpoint"] < next_signal:
                 reasons["position_or_cooldown"] += 1
                 continue
-            probability_reject = row[f"tradeability_probability_{horizon}"] < config.minimum_probability
-            return_reject = row[f"predicted_return_{horizon}"] <= minimum_edge_bps / 10_000
-            if filtered and (probability_reject or return_reject):
+            probability_reject = mode in {"probability", "both"} and row[f"tradeability_probability_{horizon}"] < config.minimum_probability
+            return_reject = mode in {"return", "both"} and row[f"predicted_return_{horizon}"] <= minimum_edge_bps / 10_000
+            if probability_reject or return_reject:
                 reason = "both" if probability_reject and return_reject else (
                     "probability_only" if probability_reject else "return_only")
                 reasons[reason] += 1

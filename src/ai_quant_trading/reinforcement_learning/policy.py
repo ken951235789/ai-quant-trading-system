@@ -13,7 +13,7 @@ import pandas as pd
 from ai_quant_trading.features import build_feature_dataset
 from ai_quant_trading.features.builder import infer_annualization_periods
 from ai_quant_trading.market_clock import completed_bars_only
-from ai_quant_trading.operations.integrity import verify_artifact_manifest
+from ai_quant_trading.operations.integrity import verify_artifact_manifest, sha256_file
 from ai_quant_trading.reinforcement_learning.config import PortfolioEnvConfig
 from ai_quant_trading.reinforcement_learning.actions import map_continuous_action
 from ai_quant_trading.reinforcement_learning.feature_contract import (
@@ -46,6 +46,8 @@ class LoadedRLPolicy:
     environment_metadata: dict[str, Any]
     feature_columns: list[str]
     env_config: PortfolioEnvConfig
+    checkpoint_sha256: str = ""
+    environment_sha256: str = ""
 
     @property
     def universal(self) -> bool:
@@ -66,6 +68,7 @@ class RLTargetSignal:
     close: float
     atr: float | None
     model_input_health: dict[str, object] | None = None
+    input_snapshot: dict[str, object] | None = None
 
 
 def _environment_dir(training_dir: Path, metadata: dict[str, Any]) -> Path:
@@ -238,6 +241,8 @@ def load_rl_policy(training_dir: str | Path, *, device: str = "cpu") -> LoadedRL
         environment_metadata,
         features,
         env_config,
+        sha256_file(_model_path(root, training_metadata)),
+        sha256_file(environment_dir / "environment.json"),
     )
 
 
@@ -526,4 +531,9 @@ def latest_rl_target(
         float(row["close"]),
         None if pd.isna(atr_value) else float(atr_value),
         model_input_health.to_dict(),
+        {"feature_columns": list(policy.feature_columns), "observation": observation.tolist(),
+         "market_feature_count": len(policy.feature_columns), "raw_action": action_value,
+         "checkpoint_sha256": policy.checkpoint_sha256,
+         "environment_sha256": policy.environment_sha256,
+         "normalization": "exact_training_normalized_observation", "oos_verified": False},
     )

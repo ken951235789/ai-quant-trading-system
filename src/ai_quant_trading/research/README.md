@@ -37,3 +37,18 @@
 `probability_sweep.py` 使用已保存模型預測，重用候選撮合與不重疊排程，研究 0% 至 100% 門檻。
 `scripts/run_probability_sweep.py` 先稽核輸入，再輸出逐模型、成本與區間比較，不變更正式設定。
 操作、成本假設及結算權益限制見 [門檻研究](../../../docs/PROBABILITY_THRESHOLD_SWEEP.md)。
+
+## 逐筆進出場圖
+
+`trade_review.py` 與 `trade_review.html` 將既有排程轉為離線 K 線檢視器，不重新撮合。
+`scripts/render_trade_review.py` 先核對資料 / 契約雜湊、帳務、時間戳與已保存統計，
+再標出進出場、固定停損停利、預定盈虧比及本筆扣成本後的 R。
+操作與可重現命令見 [逐筆圖表](../../../docs/TRADE_ENTRY_EXIT_REVIEW.md)。
+
+## 訓練交接與退出研究
+
+- `candidate_handoff.py`：從既有 Dataset 保存全候選、序列索引與分離標籤，核對來源、scaler 及 OOS 時間。
+- `exit_selection.py`：相同候選下選擇不同 R 契約的模型預測，保持 55% 與 2bps 門檻；只輸出研究提案，不送單。
+- `account_replay.py`：固定成交路徑逐棒權益、持倉浮虧、成本一致性；不聲稱已驗證標記價格清算或真實 funding。
+
+操作指令與限制見 [交接說明](../../../docs/JOURNAL_RESEARCH_20261008.md)。

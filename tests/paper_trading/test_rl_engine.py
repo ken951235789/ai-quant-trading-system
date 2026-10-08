@@ -138,6 +138,25 @@ def test_rl_target_executes_at_next_open_and_limits_position_size() -> None:
         assert len(read_account_csv(sold.paths.trades_csv)) == 1
 
 
+def test_idle_cycle_retries_journal_without_duplicate_orders(tmp_path, monkeypatch):
+    from ai_quant_trading.trading.journal import TradeJournal
+    common = dict(policy=make_policy(), model_dir="training/ppo", root_dir=tmp_path,
+                  account_id="journal_retry", config=PaperTradingConfig(initial_capital=1000))
+    def fail(*args):
+        raise OSError("test-only render failure")
+    with monkeypatch.context() as context:
+        context.setattr("ai_quant_trading.trading.journal.render_journal_png", fail)
+        run_rl_paper_cycle(make_market([.2]), **common)
+        result = run_rl_paper_cycle(make_market([.2, 0]), **common)
+    journal = TradeJournal(result.paths.account_dir / "trade_journal")
+    assert journal.records()[0]["status"] == "pending"
+    order_count = len(read_account_csv(result.paths.orders_csv))
+    repeated = run_rl_paper_cycle(make_market([.2, 0]), **common)
+    assert not repeated.processed
+    assert len(read_account_csv(result.paths.orders_csv)) == order_count
+    assert all(r["status"] == "complete" for r in journal.records())
+
+
 def test_perpetual_paper_account_uses_margin_accounting() -> None:
     class PerpetualModel(FeatureActionModel):
         class ObservationSpace:

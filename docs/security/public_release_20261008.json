@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "SECURITY_REVIEW-20261008-JOURNAL",
+  "report_type": "security_review",
+  "generated_at_utc": "2026-10-08T05:44:54Z",
+  "project": {"name": "AIQuantTradingSystem", "revision": "staged_after_df73516", "environment": "Windows; Python 3.13; curated public release"},
+  "scope": "公開版交易日誌、研究交接與桌面更新的暫存快照、歷史、測試及靜態安全檢查",
+  "overall_status": "WARN",
+  "summary": "782 測試及 4 subtests 通過。待提交快照與既有 15 commits 未發現秘密命中；沒有新增中高等級靜態提醒，但仍保留既有安全風險與外部驗證限制。",
+  "changes": [
+    "只同步審查過的原始碼、測試與去識別化研究摘要。",
+    "保留公開版隱私邊界，排除私人歷史、憑證、模型、行情、成交與圖片。",
+    "研究工具改用公開標準報告 helper，不依賴私人 Skills。",
+    "修正 Windows 測試讀取中文計畫的 UTF-8 編碼錯誤並重跑全套。"
+  ],
+  "findings": [
+    {"id": "SEC-001", "severity": "MEDIUM", "status": "ACCEPTED", "category": "static_analysis", "component": "existing_utilities",
+     "title": "既有暫存與 XML 解析提醒", "evidence": ["Bandit B108=9, B314=3；無新增 medium/high"],
+     "impact": "不可信共享環境或外部 XML 輸入可能超出目前工具假設。",
+     "recommendation": "獨立安排暫存隔離與安全 XML 改善；目前只使用可信本機輸入。"},
+    {"id": "SEC-002", "severity": "LOW", "status": "ACCEPTED", "category": "static_analysis", "component": "packaging_and_smoke",
+     "title": "固定子程序與煙霧 assert 提醒", "evidence": ["low 共 108，比上一版增加 10；新增為 B603/B607/B101"],
+     "impact": "建置依賴可信 Python、Git 與 PATH，測試 assert 不應當成正式授權控制。",
+     "recommendation": "保留參數陣列、不使用 shell 字串；正式安全判斷使用明確錯誤處理。"},
+    {"id": "REL-001", "severity": "LOW", "status": "RESOLVED", "category": "test_portability", "component": "test_kaggle_strategy_event",
+     "title": "Windows 預設編碼不能讀中文 JSON", "evidence": ["首次全套 781 passed / 1 failed；指定 UTF-8 後 782 passed"],
+     "impact": "中文計畫的可重現測試在 cp950 環境失敗。",
+     "recommendation": "文字 JSON 讀寫明確指定 UTF-8，保留 Windows 測試。"}
+  ],
+  "checks": [
+    {"id": "REL-001", "name": "公開版完整測試", "status": "PASS", "evidence": ["782 passed, 4 subtests passed"], "duration_seconds": 192.87},
+    {"id": "REL-002", "name": "Ruff、compileall、離線 Demo", "status": "PASS", "evidence": ["src/tests/scripts/tools 靜態檢查", "360 合成行情、seed 11，無交易所連線"]},
+    {"id": "SEC-001", "name": "Git index 公開邊界", "status": "PASS", "evidence": ["check_public_repository.py --staged，無命中"]},
+    {"id": "SEC-002", "name": "Gitleaks 8.30.1 暫存快照", "status": "PASS", "evidence": ["redact 模式，no leaks found"]},
+    {"id": "SEC-003", "name": "既有公開歷史", "status": "PASS", "evidence": ["15 commits，no leaks found；推送前再檢查新增 commit"]},
+    {"id": "SEC-004", "name": "Bandit 完整静態掃描", "status": "WARN", "evidence": ["0 high,12 medium,108 low; parser errors=0"]}
+  ],
+  "metrics": {"tests_passed": 782, "subtests_passed": 4, "bandit_high": 0, "bandit_medium": 12, "bandit_low": 108, "new_medium_high": 0, "deployed_models_changed": false, "private_artifacts_published": false},
+  "artifacts": [{"path": "docs/SECURITY_AUDIT_20261008.md", "role": "public_security_summary"}, {"path": "docs/research/journal_research_20261008.json", "role": "allowlisted_aggregate_research"}],
+  "residual_risks": ["未做滲透測試或刷新完整依賴漏洞資料庫。", "掃描未命中不等於零漏洞或永不外洩。", "GitHub CI 結果另看 commit Actions。", "模型研究品質、完整實盤對帳及正式交易資格未通過。"],
+  "next_actions": ["提交後再次掃描歷史，推送後核對遠端 SHA 與 Actions。", "保持資料、權重、個人設定及逐筆成交不進公開 repo。"]
+}

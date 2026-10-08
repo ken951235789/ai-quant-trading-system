@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; worker-src blob:;">
+<title>BTC 15m 逐筆交易檢視</title>
+<style>
+:root{color-scheme:light;--bg:#fff;--ink:#232b31;--muted:#59646f;--line:#d5dce1;--field:#f4f6f8;--green:#14795c;--red:#b53747}
+body.dark{color-scheme:dark;--bg:#191c20;--ink:#e9edf1;--muted:#b4bec7;--line:#444c55;--field:#242a30;--green:#4ed0a5;--red:#ff8391}
+*{box-sizing:border-box;letter-spacing:0}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Microsoft JhengHei",Arial,sans-serif}
+main{max-width:1600px;margin:auto;padding:20px 24px}header{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px}
+h1{font-size:22px;margin:0}p{margin:7px 0;color:var(--muted)}button,select,input{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:4px;min-height:36px;max-width:100%}select{padding:5px 26px 5px 8px}button{cursor:pointer}button:disabled{opacity:.4;cursor:default}
+button.icon{width:36px;flex:0 0 36px;font-size:20px}.controls{display:grid;grid-template-columns:repeat(7,minmax(100px,1fr));gap:10px;padding:16px 0;border-bottom:1px solid var(--line)}label{display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:12px}label.inline{flex-direction:row;align-items:center;gap:7px}input[type=checkbox]{width:16px;min-height:16px}
+.stats{display:grid;grid-template-columns:repeat(6,minmax(90px,1fr));gap:14px;padding:16px 0;border-bottom:1px solid var(--line)}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{font-size:20px;font-weight:600;overflow-wrap:anywhere}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 0}.toolbar #trade{flex:1;min-width:200px}.toolbar .spacer{flex:1}.positive{color:var(--green)}.negative{color:var(--red)}#chart{width:100%;height:560px;min-width:0}#empty{padding:60px 12px;text-align:center;border-bottom:1px solid var(--line)}[hidden]{display:none!important}
+.detail{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px;padding:14px 0;border-top:1px solid var(--line)}.detail span{color:var(--muted);font-size:12px;display:block}.detail strong{font-weight:500;overflow-wrap:anywhere}.note{font-size:12px}.table-wrap{overflow:auto;max-height:310px;border-top:1px solid var(--line)}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:13px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}th{position:sticky;top:0;background:var(--field)}tbody tr{cursor:pointer}tbody tr.active{background:var(--field)}h2{font-size:16px;margin:18px 0 8px}footer{border-top:1px solid var(--line);padding-top:12px;margin-top:16px}.limit{color:var(--muted);font-size:12px}
+@media(max-width:1000px){.controls{grid-template-columns:repeat(4,minmax(100px,1fr))}.stats{grid-template-columns:repeat(3,minmax(80px,1fr))}}
+@media(max-width:560px){main{padding:12px}h1{font-size:19px}.controls{grid-template-columns:repeat(2,minmax(0,1fr))}.detail{grid-template-columns:repeat(2,minmax(0,1fr))}.metric strong{font-size:18px}#chart{height:420px}.toolbar #trade{min-width:0;width:calc(100% - 88px);flex:auto}.stats{gap:10px}header{align-items:flex-start}}
+</style></head><body><main>
+<header><div><h1>BTCUSDT · 15m 逐筆交易</h1><p>Binance USD-M 永續合約 / 歷史研究回放</p></div><label class="inline"><input id="dark" type="checkbox">深色</label></header>
+<section class="controls" aria-label="研究條件">
+<label>策略<select id="family"><option value="original">原突破</option><option value="trend_pullback">趨勢回調</option><option value="vwap_reversion">VWAP 回歸</option></select></label>
+<label>訊號篩選<select id="policy"><option value="no_ai">無 AI 基準</option><option value="transformer">Transformer</option></select></label>
+<label>特徵版本<select id="variant"><option value="F_compact_combined">新精簡特徵</option><option value="F_existing">舊特徵</option></select></label>
+<label>Seed<select id="seed"><option>42</option><option>137</option><option>2026</option></select></label>
+<label>機率門檻<select id="threshold"></select></label>
+<label>區間<select id="split"><option value="test">Test（研究測試）</option><option value="selection">Selection</option></select></label>
+<label>成本<select id="scenario"><option value="base">基本假設</option><option value="stress">壓力假設</option><option value="zero">零成本</option></select></label>
+</section>
+<div id="summary" class="stats"></div><p id="scope" class="note"></p><p id="rules" class="note"></p>
+<div class="toolbar"><button id="prev" class="icon" title="上一筆" aria-label="上一筆">&#8592;</button><select id="trade" aria-label="交易"></select><button id="next" class="icon" title="下一筆" aria-label="下一筆">&#8594;</button><label class="inline">前後 K 棒<select id="context"><option>32</option><option selected>64</option><option>128</option></select></label><label class="inline">時區<select id="zone"><option value="8">台北 UTC+8</option><option value="0">UTC</option></select></label></div>
+<div id="empty" hidden>此條件沒有成交。盈虧比無法計算，不能視為零風險或獲利。</div>
+<div id="chart"></div><div id="detail" class="detail"></div><p id="timing" class="note"></p>
+<h2>成交紀錄</h2><div class="table-wrap"><table><thead><tr><th>序號</th><th>進場時間</th><th>方向</th><th>進場價</th><th>出場價</th><th>退出原因</th><th>淨報酬</th><th>實現 R</th></tr></thead><tbody id="trades"></tbody></table></div>
+<footer><p>預定盈虧比 = 停利距離 / 停損距離；實際盈虧比 = 平均獲利交易淨報酬 / 平均虧損交易淨報酬絕對值。</p><p>實現 R = 本筆淨報酬 / 初始停損距離比例。圖上標記為模擬成交價，滑價可能使其位於 K 棒範圍之外。</p><p class="limit">成本是假設，資金費是準備金而非歷史實際費率，稅務未驗證。各成本情境重新撮合，不是固定成交單純扣成本。報酬以名目部位為分母，不是本金或槓桿後報酬；未驗證完整帳戶浮虧、保證金與清算。出場後 K 棒是已知歷史，不是 Transformer 預測。歷史 Test 已反覆研究，不能據此挑選最佳門檻或取得實盤資格。</p></footer>
+</main><script>/*__PLOTLY__*/</script><script>
+"use strict";
+const D=/*__PAYLOAD__*/;
+const $=id=>document.getElementById(id), labels={stop:'停損',target:'停利',regime:'狀態退出',time:'持有到期'}, families={original:'原突破',trend_pullback:'趨勢回調',vwap_reversion:'VWAP 回歸'};
+let current=null, trades=[], position=0;
+const fmt=(v,n=2)=>v===null||v===undefined?'無法計算':Number(v).toLocaleString('en-US',{minimumFractionDigits:n,maximumFractionDigits:n});
+const pct=v=>v===null||v===undefined?'無法計算':fmt(v*100,3)+'%';
+const at=i=>D.bars[i-D.offset];
+const stamp=i=>new Date(at(i)[0]+Number($('zone').value)*3600000).toISOString().slice(0,16).replace('T',' ');
+const dateX=i=>stamp(i).replace(' ','T');
+function addMetric(root,name,value,cls=''){const box=document.createElement('div');box.className='metric';const s=document.createElement('span');s.textContent=name;const b=document.createElement('strong');b.textContent=value;b.className=cls;box.append(s,b);root.append(box)}
+function options(){for(let i=0;i<=100;i++)$('threshold').add(new Option(i+'%',i));$('threshold').value='55'}
+function selectSchedule(){
+ const noAI=$('policy').value==='no_ai';['variant','seed','threshold'].forEach(id=>$(id).disabled=noAI);
+ current=D.rows.find(r=>r.family===$('family').value&&r.policy===$('policy').value&&r.split===$('split').value&&r.scenario===$('scenario').value&&
+   (noAI||(r.variant===$('variant').value&&r.seed===Number($('seed').value)&&r.threshold_pct===Number($('threshold').value))));
+ if(!current)throw Error('缺少研究條件，不以其他結果代替');
+ trades=D.schedules[current.schedule];position=0;
+ const root=$('summary');root.replaceChildren();
+ addMetric(root,'不重疊成交',String(current.trades));addMetric(root,'實際勝率',pct(current.actual_win_rate));addMetric(root,'實際淨盈虧比',fmt(current.payoff_ratio)+' : 1');addMetric(root,'平均獲利',pct(current.average_win));addMetric(root,'平均虧損幅度',pct(current.average_loss));addMetric(root,'每笔平均淨報酬',pct(current.mean_net),current.mean_net>0?'positive':current.mean_net<0?'negative':'');
+ $('scope').textContent=(noAI?'無 AI 規則基準，不是模型交易。':'Transformer 篩選；預測淨收益仍須 > 2 bps。')+' '+(current.split==='test'?'Test':'Selection')+' 訊號範圍：'+D.windows[current.family+'|'+current.split]+' UTC。';
+ const c=D.contracts[current.contract_sha256], regime={loss:'方向狀態消失（含中性）即退出',opposite:'只有反向狀態才提前退出',disabled:'不使用狀態提前退出'};
+ $('rules').textContent=`固定停損 ${c.stop_atr} ATR；停利 ${c.stop_atr*c.reward_r} ATR；最長 ${c.holding_bars} 棒；${regime[c.regime_exit]}。單邊費率 ${c.fee_bps} bps / 單邊滑價 ${c.slippage_bps} bps / 全價差 ${c.spread_bps} bps / 每次結算 funding 準備金 ${c.funding_reserve_bps} bps。`;
+ refreshTradeOptions();draw();
+}
+function refreshTradeOptions(){
+ $('trade').replaceChildren();trades.forEach((t,i)=>$('trade').add(new Option(`${i+1} / ${trades.length} · ${stamp(t.entry)} · ${t.side===1?'多':'空'} · ${pct(t.net_return)}`,i)));
+ const tbody=$('trades');tbody.replaceChildren();trades.forEach((t,i)=>{const tr=document.createElement('tr');const values=[i+1,stamp(t.entry),t.side===1?'做多':'做空',fmt(t.entry_price),fmt(t.exit_price),labels[t.reason],pct(t.net_return),fmt(t.net_r)+'R'];values.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td)});tr.onclick=()=>{position=i;draw()};tbody.append(tr)});
+}
+function draw(){
+ const empty=!trades.length;$('empty').hidden=!empty;$('chart').hidden=empty;$('detail').hidden=empty;$('timing').hidden=empty;$('trade').disabled=empty;$('prev').disabled=empty||position===0;$('next').disabled=empty||position===trades.length-1;
+ if(empty){Plotly.purge('chart');$('detail').replaceChildren();$('timing').textContent='';return}
+ $('trade').value=String(position);Array.from($('trades').children).forEach((tr,i)=>tr.classList.toggle('active',i===position));
+ const t=trades[position], n=Number($('context').value), first=Math.max(D.offset,t.entry-n), last=Math.min(D.offset+D.bars.length-1,t.exit+n), bars=D.bars.slice(first-D.offset,last-D.offset+1), x=bars.map((_,i)=>dateX(first+i));
+ const dark=$('dark').checked, ink=dark?'#e9edf1':'#232b31', bg=dark?'#191c20':'#ffffff', grid=dark?'#363e46':'#e0e5e9', green=dark?'#4ed0a5':'#14795c', red=dark?'#ff8391':'#b53747';
+ const data=[{type:'candlestick',x,open:bars.map(b=>b[1]),high:bars.map(b=>b[2]),low:bars.map(b=>b[3]),close:bars.map(b=>b[4]),name:'BTC 15m',increasing:{line:{color:green},fillcolor:green},decreasing:{line:{color:red},fillcolor:red}},
+ {type:'scatter',mode:'lines',x:[dateX(t.entry),dateX(t.exit)],y:[t.entry_price,t.exit_price],line:{color:ink,width:1,dash:'dot'},showlegend:false,hoverinfo:'skip'},
+ {type:'scatter',mode:'markers',name:t.side===1?'多單進場':'空單進場',x:[dateX(t.entry)],y:[t.entry_price],marker:{symbol:t.side===1?'triangle-up':'triangle-down',size:15,color:'#359fe1',line:{color:bg,width:1}},hovertemplate:'進場 %{y:.2f}<extra></extra>'},
+ {type:'scatter',mode:'markers',name:'出場 / '+labels[t.reason],x:[dateX(t.exit)],y:[t.exit_price],marker:{symbol:'x',size:12,color:t.net_return>0?green:red},hovertemplate:'出場 %{y:.2f}<extra></extra>'}];
+ const shapes=[], annotations=[];
+ for(const [y,label,color] of [[t.entry_price,'進場',ink],[t.stop,'停損',red],[t.target,'停利',green]]){
+  shapes.push({type:'line',xref:'x',yref:'y',x0:dateX(t.entry),x1:dateX(Math.min(last,t.exit+Math.max(1,n-6))),y0:y,y1:y,line:{color,width:1,dash:label==='進場'?'dot':'dash'}});
+  annotations.push({xref:'paper',x:1,xanchor:'right',yref:'y',y,text:label+' '+fmt(y),showarrow:false,bgcolor:bg,font:{color,size:11},borderpad:2});
+ }
+ for(const [y,color] of [[t.stop,'rgba(210,63,82,.09)'],[t.target,'rgba(18,148,103,.09)']])shapes.push({type:'rect',xref:'x',yref:'y',x0:dateX(t.entry),x1:dateX(Math.min(last,t.exit+1)),y0:t.entry_price,y1:y,fillcolor:color,line:{width:0},layer:'below'});
+ annotations.push({xref:'x',yref:'y',x:dateX(t.entry),y:t.entry_price,text:'進場',showarrow:true,ax:-26,ay:35,arrowcolor:'#359fe1',font:{color:ink},bgcolor:bg});
+ annotations.push({xref:'x',yref:'y',x:dateX(t.exit),y:t.exit_price,text:`${labels[t.reason]} ${fmt(t.net_r)}R`,showarrow:true,ax:40,ay:-45,arrowcolor:ink,font:{color:ink},bgcolor:bg});
+ const min=Math.min(...bars.map(b=>b[3]),t.stop,t.exit_price,t.entry_price), max=Math.max(...bars.map(b=>b[2]),t.target,t.exit_price,t.entry_price), pad=(max-min)*.10;
+ const layout={paper_bgcolor:bg,plot_bgcolor:bg,font:{color:ink,family:'Microsoft JhengHei,Arial'},margin:{l:58,r:12,t:70,b:48},showlegend:true,legend:{orientation:'h',x:0,y:1.16,font:{size:11}},xaxis:{type:'date',rangeslider:{visible:false},gridcolor:grid,title:{text:$('zone').value==='8'?'台北時間 (UTC+8)':'UTC'},range:[x[0],x[x.length-1]]},yaxis:{gridcolor:grid,title:{text:'USDT'},range:[min-pad,max+pad],fixedrange:false},shapes,annotations,hoverlabel:{bgcolor:bg,font:{color:ink}},dragmode:'pan'};
+ Plotly.react('chart',data,layout,{responsive:true,displaylogo:false,scrollZoom:true,modeBarButtonsToRemove:['select2d','lasso2d','toggleSpikelines'],toImageButtonOptions:{filename:'btc15m-trade-'+(position+1)}});
+ const detail=$('detail');detail.replaceChildren();
+ for(const [k,v] of [['預定報酬 / 風險',fmt(t.planned_rr)+' : 1'],['實現淨 R',fmt(t.net_r,3)+'R'],['成交價變化（已含滑價與價差）',pct(t.price_return)],['扣成本淨報酬',pct(t.net_return)],['固定路徑毛收益',pct(t.gross)],['價差 / 滑價',pct(t.spread)+' / '+pct(t.slippage)],['雙邊手續費 / funding 準備金',pct(t.fee)+' / '+pct(t.funding)],['持有時間',t.holding_min===t.holding_max?t.holding_min+' 分鐘':t.holding_min+' 至 '+t.holding_max+' 分鐘']]){const box=document.createElement('div'),s=document.createElement('span'),b=document.createElement('strong');s.textContent=k;b.textContent=v;box.append(s,b);detail.append(box)}
+ $('timing').textContent=`進場：${stamp(t.entry)}；出場棒：${stamp(t.exit)}。`+(t.intrabar?'停損 / 停利的棒內成交時刻未知，標記對齊出場棒，不代表開盤成交。同棒雙觸價採停損優先。':'狀態退出 / 到期採該棒開盤成交。')+' 停損與停利價格以進場時 ATR 固定，非移動停損。';
+}
+options();for(const id of ['family','policy','variant','seed','threshold','split','scenario'])$(id).onchange=selectSchedule;
+$('trade').onchange=()=>{position=Number($('trade').value);draw()};$('prev').onclick=()=>{position--;draw()};$('next').onclick=()=>{position++;draw()};$('context').onchange=draw;
+$('zone').onchange=()=>{refreshTradeOptions();draw()};
+try{$('dark').checked=localStorage.getItem('btc-trade-review-dark')==='1'}catch(e){}
+function theme(){document.body.classList.toggle('dark',$('dark').checked);try{localStorage.setItem('btc-trade-review-dark',$('dark').checked?'1':'0')}catch(e){}draw()}
+$('dark').onchange=theme;document.body.classList.toggle('dark',$('dark').checked);selectSchedule();
+</script></body></html>

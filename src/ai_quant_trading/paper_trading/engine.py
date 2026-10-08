@@ -10,6 +10,7 @@ import pandas as pd
 from ai_quant_trading.features.builder import infer_annualization_periods
 from ai_quant_trading.market_clock import completed_bars_only, interval_duration
 from ai_quant_trading.paper_trading.state import PaperAccountState, utc_now_text
+from ai_quant_trading.trading.journal import journal_call
 from ai_quant_trading.paper_trading.storage import (
     ORDER_COLUMNS,
     PERFORMANCE_COLUMNS,
@@ -188,6 +189,9 @@ def _close_position(
             "leverage": state.position_leverage,
         },
     )
+    journal_call(paths, "closed", state, row, quantity=quantity, entry_fee=state.entry_fee,
+                 exit_fee=exit_fee, carry=state.position_carry_cost, gross=gross_pnl, net=net_pnl,
+                 reason=reason, fill_price=fill_price)
     state.quantity = 0.0
     state.entry_time = None
     state.entry_price = None
@@ -395,6 +399,8 @@ def _execute_rl_target(
             "cash_after": state.cash,
         },
     )
+    journal_call(paths, "opened", state, row, added=previous_abs_quantity > 1e-12,
+                 fill_price=fill_price, filled_quantity=added_quantity)
     return 1 if side == "long" else -1
 
 
@@ -492,6 +498,9 @@ def _reduce_rl_position(
             "leverage": state.position_leverage,
         },
     )
+    journal_call(paths, "closed", state, row, quantity=closed_quantity, entry_fee=allocated_entry_fee,
+                 exit_fee=exit_fee, carry=allocated_carry_cost, gross=gross_pnl, net=net_pnl,
+                 reason=state.pending_reason, fill_price=fill_price, partial=True)
     state.quantity = direction * desired_abs_quantity
     state.entry_cost -= allocated_entry_cost
     state.entry_fee -= allocated_entry_fee
@@ -625,6 +634,7 @@ def _process_bar(
         state.pending_reason = (
             "daily_loss_limit" if daily_halted else "consecutive_loss_limit"
         )
+    journal_call(paths, "market", row)
     executed_signal = _execute_pending_signal(state, row, paths) if execute_pending else 0
     intrabar_signal = _apply_intrabar_risk(state, row, paths)
     if intrabar_signal:
@@ -831,4 +841,5 @@ def _process_bar(
             "leverage": state.position_leverage,
         },
     )
+    journal_call(paths, "decision", state, row, prediction_row)
     return executed_signal, policy_signal, target_fraction
