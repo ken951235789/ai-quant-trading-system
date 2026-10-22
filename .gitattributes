@@ -9,7 +9,9 @@
 *.yml text eol=lf
 *.sh text eol=lf
 
+# 公開研究封存含逐檔雜湊，Windows checkout 也必須保持相同位元組。
+docs/research/20261022/* text eol=lf
+
 # Windows 批次檔保留 CRLF。
 *.bat text eol=crlf
 *.cmd text eol=crlf
-

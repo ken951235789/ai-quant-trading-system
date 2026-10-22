@@ -1,0 +1,3579 @@
+{
+  "publication_note": "字串引用統計來自本機研究版，不代表此公開版本已實作或啟用。",
+  "summary": {
+    "groups": 41,
+    "fields": 210,
+    "literal_references_found": 148,
+    "not_found_as_literal": 62,
+    "by_role": {
+      "market": 154,
+      "quality": 9,
+      "contract": 5,
+      "oos": 9,
+      "portfolio": 9,
+      "execution": 4,
+      "label": 7,
+      "raw": 13
+    },
+    "active_features_added": 0,
+    "model_contract_changed": false
+  },
+  "rows": [
+    {
+      "column": "return_1",
+      "group": "price_return",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "報酬與變化速度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "報酬比例或對數報酬；重複表達需消融",
+      "availability": "當根收盤後",
+      "risk": "長短窗高度相關，不全部塞入",
+      "families": [
+        "trend",
+        "momentum",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "log_return_1",
+      "group": "price_return",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "報酬與變化速度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "報酬比例或對數報酬；重複表達需消融",
+      "availability": "當根收盤後",
+      "risk": "長短窗高度相關，不全部塞入",
+      "families": [
+        "trend",
+        "momentum",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "return_3",
+      "group": "price_return",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "報酬與變化速度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "報酬比例或對數報酬；重複表達需消融",
+      "availability": "當根收盤後",
+      "risk": "長短窗高度相關，不全部塞入",
+      "families": [
+        "trend",
+        "momentum",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "return_5",
+      "group": "price_return",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "報酬與變化速度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "報酬比例或對數報酬；重複表達需消融",
+      "availability": "當根收盤後",
+      "risk": "長短窗高度相關，不全部塞入",
+      "families": [
+        "trend",
+        "momentum",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "return_20",
+      "group": "price_return",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "報酬與變化速度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "報酬比例或對數報酬；重複表達需消融",
+      "availability": "當根收盤後",
+      "risk": "長短窗高度相關，不全部塞入",
+      "families": [
+        "trend",
+        "momentum",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "roc_12_pct",
+      "group": "price_return",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "報酬與變化速度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "報酬比例或對數報酬；重複表達需消融",
+      "availability": "當根收盤後",
+      "risk": "長短窗高度相關，不全部塞入",
+      "families": [
+        "trend",
+        "momentum",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "candle_body_pct",
+      "group": "price_geometry",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "K線實體與範圍",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "價格比率；同義欄位擇一",
+      "availability": "收盤後，不可提前知道high/low",
+      "risk": "同義欄位會重複加權",
+      "families": [
+        "chart_patterns",
+        "breakout"
+      ]
+    },
+    {
+      "column": "range_pct",
+      "group": "price_geometry",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "K線實體與範圍",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "價格比率；同義欄位擇一",
+      "availability": "收盤後，不可提前知道high/low",
+      "risk": "同義欄位會重複加權",
+      "families": [
+        "chart_patterns",
+        "breakout"
+      ]
+    },
+    {
+      "column": "price_body_ratio",
+      "group": "price_geometry",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "K線實體與範圍",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "價格比率；同義欄位擇一",
+      "availability": "收盤後，不可提前知道high/low",
+      "risk": "同義欄位會重複加權",
+      "families": [
+        "chart_patterns",
+        "breakout"
+      ]
+    },
+    {
+      "column": "price_range_ratio",
+      "group": "price_geometry",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "K線實體與範圍",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "價格比率；同義欄位擇一",
+      "availability": "收盤後，不可提前知道high/low",
+      "risk": "同義欄位會重複加權",
+      "families": [
+        "chart_patterns",
+        "breakout"
+      ]
+    },
+    {
+      "column": "upper_wick_pct",
+      "group": "wick_location",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "影線與收盤位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "以全棒範圍或價格縮放",
+      "availability": "完整收盤",
+      "risk": "零範圍需遮罩；不等於真實吸收",
+      "families": [
+        "chart_patterns",
+        "structure"
+      ]
+    },
+    {
+      "column": "lower_wick_pct",
+      "group": "wick_location",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "影線與收盤位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "以全棒範圍或價格縮放",
+      "availability": "完整收盤",
+      "risk": "零範圍需遮罩；不等於真實吸收",
+      "families": [
+        "chart_patterns",
+        "structure"
+      ]
+    },
+    {
+      "column": "close_location_value",
+      "group": "wick_location",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "影線與收盤位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "以全棒範圍或價格縮放",
+      "availability": "完整收盤",
+      "risk": "零範圍需遮罩；不等於真實吸收",
+      "families": [
+        "chart_patterns",
+        "structure"
+      ]
+    },
+    {
+      "column": "price_close_location",
+      "group": "wick_location",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "影線與收盤位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "以全棒範圍或價格縮放",
+      "availability": "完整收盤",
+      "risk": "零範圍需遮罩；不等於真實吸收",
+      "families": [
+        "chart_patterns",
+        "structure"
+      ]
+    },
+    {
+      "column": "wick_imbalance",
+      "group": "wick_location",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "影線與收盤位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "以全棒範圍或價格縮放",
+      "availability": "完整收盤",
+      "risk": "零範圍需遮罩；不等於真實吸收",
+      "families": [
+        "chart_patterns",
+        "structure"
+      ]
+    },
+    {
+      "column": "ema_20_gap",
+      "group": "ma_distance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "均線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例或ATR倍數，擇一版本",
+      "availability": "對應週期已收盤且暖機完整",
+      "risk": "不能與原始均線價格重複混入",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "ema_50_gap",
+      "group": "ma_distance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "均線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例或ATR倍數，擇一版本",
+      "availability": "對應週期已收盤且暖機完整",
+      "risk": "不能與原始均線價格重複混入",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "ema_200_gap",
+      "group": "ma_distance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "均線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例或ATR倍數，擇一版本",
+      "availability": "對應週期已收盤且暖機完整",
+      "risk": "不能與原始均線價格重複混入",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "ema_20_atr",
+      "group": "ma_distance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "均線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例或ATR倍數，擇一版本",
+      "availability": "對應週期已收盤且暖機完整",
+      "risk": "不能與原始均線價格重複混入",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "ema_50_atr",
+      "group": "ma_distance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "均線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例或ATR倍數，擇一版本",
+      "availability": "對應週期已收盤且暖機完整",
+      "risk": "不能與原始均線價格重複混入",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "ema_200_atr",
+      "group": "ma_distance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "均線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例或ATR倍數，擇一版本",
+      "availability": "對應週期已收盤且暖機完整",
+      "risk": "不能與原始均線價格重複混入",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "short_ema_5_gap",
+      "group": "ma_distance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "均線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例或ATR倍數，擇一版本",
+      "availability": "對應週期已收盤且暖機完整",
+      "risk": "不能與原始均線價格重複混入",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "short_ema_200_gap",
+      "group": "ma_distance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "均線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例或ATR倍數，擇一版本",
+      "availability": "對應週期已收盤且暖機完整",
+      "risk": "不能與原始均線價格重複混入",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "ema_20_slope_5",
+      "group": "trend_slope",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "趨勢斜率與排列",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例變化或ATR尺度",
+      "availability": "只用過去窗口",
+      "risk": "斜率定義不同需獨立版本",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "linear_regression_slope_20",
+      "group": "trend_slope",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "趨勢斜率與排列",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例變化或ATR尺度",
+      "availability": "只用過去窗口",
+      "risk": "斜率定義不同需獨立版本",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "ema_20_50_atr",
+      "group": "trend_slope",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "趨勢斜率與排列",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例變化或ATR尺度",
+      "availability": "只用過去窗口",
+      "risk": "斜率定義不同需獨立版本",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "ema_50_200_atr",
+      "group": "trend_slope",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "趨勢斜率與排列",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "比例變化或ATR尺度",
+      "availability": "只用過去窗口",
+      "risk": "斜率定義不同需獨立版本",
+      "families": [
+        "trend",
+        "pullback"
+      ]
+    },
+    {
+      "column": "adx_14",
+      "group": "trend_strength",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "方向強度與效率",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "核對0至1或0至100原契約",
+      "availability": "收盤後；初始化暖機",
+      "risk": "ADX不代表方向，不能自行改尺度",
+      "families": [
+        "trend",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "plus_di_14",
+      "group": "trend_strength",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "方向強度與效率",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "核對0至1或0至100原契約",
+      "availability": "收盤後；初始化暖機",
+      "risk": "ADX不代表方向，不能自行改尺度",
+      "families": [
+        "trend",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "minus_di_14",
+      "group": "trend_strength",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "方向強度與效率",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "核對0至1或0至100原契約",
+      "availability": "收盤後；初始化暖機",
+      "risk": "ADX不代表方向，不能自行改尺度",
+      "families": [
+        "trend",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "choppiness_14",
+      "group": "trend_strength",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "方向強度與效率",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "核對0至1或0至100原契約",
+      "availability": "收盤後；初始化暖機",
+      "risk": "ADX不代表方向，不能自行改尺度",
+      "families": [
+        "trend",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "efficiency_ratio_candidate",
+      "group": "trend_strength",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "方向強度與效率",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "核對0至1或0至100原契約",
+      "availability": "收盤後；初始化暖機",
+      "risk": "ADX不代表方向，不能自行改尺度",
+      "families": [
+        "trend",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "supertrend_direction_10_3",
+      "group": "trend_protection",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "趨勢線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向與ATR距離",
+      "availability": "前棒可得保護線",
+      "risk": "欄名不保證實際ATR窗口，需核對實作",
+      "families": [
+        "trend"
+      ]
+    },
+    {
+      "column": "supertrend_distance_atr",
+      "group": "trend_protection",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "趨勢線距離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向與ATR距離",
+      "availability": "前棒可得保護線",
+      "risk": "欄名不保證實際ATR窗口，需核對實作",
+      "families": [
+        "trend"
+      ]
+    },
+    {
+      "column": "psar_distance_atr_candidate",
+      "group": "trend_protection",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "趨勢線距離",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "方向與ATR距離",
+      "availability": "前棒可得保護線",
+      "risk": "欄名不保證實際ATR窗口，需核對實作",
+      "families": [
+        "trend"
+      ]
+    },
+    {
+      "column": "rsi_14",
+      "group": "oscillator",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "震盪位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "固定有界尺度；只在訓練窗擬合其他轉換",
+      "availability": "收盤後",
+      "risk": "超買不是必跌；相似指標逐組比較",
+      "families": [
+        "reversion",
+        "pullback",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "short_rsi_2",
+      "group": "oscillator",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "震盪位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "固定有界尺度；只在訓練窗擬合其他轉換",
+      "availability": "收盤後",
+      "risk": "超買不是必跌；相似指標逐組比較",
+      "families": [
+        "reversion",
+        "pullback",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "stoch_rsi_k_14",
+      "group": "oscillator",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "震盪位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "固定有界尺度；只在訓練窗擬合其他轉換",
+      "availability": "收盤後",
+      "risk": "超買不是必跌；相似指標逐組比較",
+      "families": [
+        "reversion",
+        "pullback",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "stoch_rsi_d_3",
+      "group": "oscillator",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "震盪位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "固定有界尺度；只在訓練窗擬合其他轉換",
+      "availability": "收盤後",
+      "risk": "超買不是必跌；相似指標逐組比較",
+      "families": [
+        "reversion",
+        "pullback",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "cci_normalized_candidate",
+      "group": "oscillator",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "震盪位置",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "固定有界尺度；只在訓練窗擬合其他轉換",
+      "availability": "收盤後",
+      "risk": "超買不是必跌；相似指標逐組比較",
+      "families": [
+        "reversion",
+        "pullback",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "williams_r_candidate",
+      "group": "oscillator",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "震盪位置",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "固定有界尺度；只在訓練窗擬合其他轉換",
+      "availability": "收盤後",
+      "risk": "超買不是必跌；相似指標逐組比較",
+      "families": [
+        "reversion",
+        "pullback",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "macd_pct",
+      "group": "momentum_histogram",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "平滑動能與柱變化",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "除價格或ATR，禁止用絕對價格捷徑",
+      "availability": "對應週期收盤",
+      "risk": "MACD派生欄相關度高",
+      "families": [
+        "momentum",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "macd_signal_pct",
+      "group": "momentum_histogram",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "平滑動能與柱變化",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "除價格或ATR，禁止用絕對價格捷徑",
+      "availability": "對應週期收盤",
+      "risk": "MACD派生欄相關度高",
+      "families": [
+        "momentum",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "macd_histogram_pct",
+      "group": "momentum_histogram",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "平滑動能與柱變化",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "除價格或ATR，禁止用絕對價格捷徑",
+      "availability": "對應週期收盤",
+      "risk": "MACD派生欄相關度高",
+      "families": [
+        "momentum",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "macd_histogram_atr",
+      "group": "momentum_histogram",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "平滑動能與柱變化",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "除價格或ATR，禁止用絕對價格捷徑",
+      "availability": "對應週期收盤",
+      "risk": "MACD派生欄相關度高",
+      "families": [
+        "momentum",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "tsi_candidate",
+      "group": "momentum_histogram",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "平滑動能與柱變化",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "除價格或ATR，禁止用絕對價格捷徑",
+      "availability": "對應週期收盤",
+      "risk": "MACD派生欄相關度高",
+      "families": [
+        "momentum",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "rsi_price_divergence_confirmed_candidate",
+      "group": "confirmed_divergence",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "確認式背離與失敗擺動",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "方向、強度及確認後經過棒數",
+      "availability": "右側pivot確認後，不回填pivot當時",
+      "risk": "本群多為待實作，不能用事後ZigZag",
+      "families": [
+        "structure",
+        "chart_patterns"
+      ]
+    },
+    {
+      "column": "macd_price_divergence_confirmed_candidate",
+      "group": "confirmed_divergence",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "確認式背離與失敗擺動",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "方向、強度及確認後經過棒數",
+      "availability": "右側pivot確認後，不回填pivot當時",
+      "risk": "本群多為待實作，不能用事後ZigZag",
+      "families": [
+        "structure",
+        "chart_patterns"
+      ]
+    },
+    {
+      "column": "failure_swing_confirmed_candidate",
+      "group": "confirmed_divergence",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "確認式背離與失敗擺動",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "方向、強度及確認後經過棒數",
+      "availability": "右側pivot確認後，不回填pivot當時",
+      "risk": "本群多為待實作，不能用事後ZigZag",
+      "families": [
+        "structure",
+        "chart_patterns"
+      ]
+    },
+    {
+      "column": "pivot_age_bars_candidate",
+      "group": "confirmed_divergence",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "確認式背離與失敗擺動",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "方向、強度及確認後經過棒數",
+      "availability": "右側pivot確認後，不回填pivot當時",
+      "risk": "本群多為待實作，不能用事後ZigZag",
+      "families": [
+        "structure",
+        "chart_patterns"
+      ]
+    },
+    {
+      "column": "atr_pct",
+      "group": "volatility_scale",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "波動幅度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "百分比與年化慣例明確分開",
+      "availability": "只用截至當時報酬",
+      "risk": "不是未來波動；OHLC估計各有假設",
+      "families": [
+        "breakout",
+        "options"
+      ]
+    },
+    {
+      "column": "historical_volatility_20",
+      "group": "volatility_scale",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "波動幅度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "百分比與年化慣例明確分開",
+      "availability": "只用截至當時報酬",
+      "risk": "不是未來波動；OHLC估計各有假設",
+      "families": [
+        "breakout",
+        "options"
+      ]
+    },
+    {
+      "column": "realized_volatility_20",
+      "group": "volatility_scale",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "波動幅度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "百分比與年化慣例明確分開",
+      "availability": "只用截至當時報酬",
+      "risk": "不是未來波動；OHLC估計各有假設",
+      "families": [
+        "breakout",
+        "options"
+      ]
+    },
+    {
+      "column": "parkinson_volatility_20",
+      "group": "volatility_scale",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "波動幅度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "百分比與年化慣例明確分開",
+      "availability": "只用截至當時報酬",
+      "risk": "不是未來波動；OHLC估計各有假設",
+      "families": [
+        "breakout",
+        "options"
+      ]
+    },
+    {
+      "column": "bb_width_20",
+      "group": "compression",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "壓縮與波動狀態",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "歷史排名或訓練窗門檻",
+      "availability": "分位數不得用全樣本",
+      "risk": "低波動不代表必定突破",
+      "families": [
+        "breakout",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "squeeze_on",
+      "group": "compression",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "壓縮與波動狀態",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "歷史排名或訓練窗門檻",
+      "availability": "分位數不得用全樣本",
+      "risk": "低波動不代表必定突破",
+      "families": [
+        "breakout",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "high_volatility_regime",
+      "group": "compression",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "壓縮與波動狀態",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "歷史排名或訓練窗門檻",
+      "availability": "分位數不得用全樣本",
+      "risk": "低波動不代表必定突破",
+      "families": [
+        "breakout",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "low_volatility_regime",
+      "group": "compression",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "壓縮與波動狀態",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "歷史排名或訓練窗門檻",
+      "availability": "分位數不得用全樣本",
+      "risk": "低波動不代表必定突破",
+      "families": [
+        "breakout",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "volatility_percentile_candidate",
+      "group": "compression",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "壓縮與波動狀態",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "歷史排名或訓練窗門檻",
+      "availability": "分位數不得用全樣本",
+      "risk": "低波動不代表必定突破",
+      "families": [
+        "breakout",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "bb_zscore_20",
+      "group": "channel_position",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "通道位置與偏離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "Z分數、通道相對位置",
+      "availability": "通道邊界是否排除當棒須固定",
+      "risk": "相關欄位重複，不各算獨立優勢",
+      "families": [
+        "breakout",
+        "reversion"
+      ]
+    },
+    {
+      "column": "short_bb_zscore_20",
+      "group": "channel_position",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "通道位置與偏離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "Z分數、通道相對位置",
+      "availability": "通道邊界是否排除當棒須固定",
+      "risk": "相關欄位重複，不各算獨立優勢",
+      "families": [
+        "breakout",
+        "reversion"
+      ]
+    },
+    {
+      "column": "keltner_position_20",
+      "group": "channel_position",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "通道位置與偏離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "Z分數、通道相對位置",
+      "availability": "通道邊界是否排除當棒須固定",
+      "risk": "相關欄位重複，不各算獨立優勢",
+      "families": [
+        "breakout",
+        "reversion"
+      ]
+    },
+    {
+      "column": "donchian_position_20",
+      "group": "channel_position",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "通道位置與偏離",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "Z分數、通道相對位置",
+      "availability": "通道邊界是否排除當棒須固定",
+      "risk": "相關欄位重複，不各算獨立優勢",
+      "families": [
+        "breakout",
+        "reversion"
+      ]
+    },
+    {
+      "column": "previous_high_20_atr",
+      "group": "levels_range",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "已知價位與區間位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "ATR距離或區間比率",
+      "availability": "前日／前週必須完整結束",
+      "risk": "當日最終高低不可提前使用",
+      "families": [
+        "structure",
+        "session"
+      ]
+    },
+    {
+      "column": "previous_low_20_atr",
+      "group": "levels_range",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "已知價位與區間位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "ATR距離或區間比率",
+      "availability": "前日／前週必須完整結束",
+      "risk": "當日最終高低不可提前使用",
+      "families": [
+        "structure",
+        "session"
+      ]
+    },
+    {
+      "column": "range_position_20",
+      "group": "levels_range",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "已知價位與區間位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "ATR距離或區間比率",
+      "availability": "前日／前週必須完整結束",
+      "risk": "當日最終高低不可提前使用",
+      "families": [
+        "structure",
+        "session"
+      ]
+    },
+    {
+      "column": "previous_day_high_distance_candidate",
+      "group": "levels_range",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "已知價位與區間位置",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "ATR距離或區間比率",
+      "availability": "前日／前週必須完整結束",
+      "risk": "當日最終高低不可提前使用",
+      "families": [
+        "structure",
+        "session"
+      ]
+    },
+    {
+      "column": "previous_day_low_distance_candidate",
+      "group": "levels_range",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "已知價位與區間位置",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "ATR距離或區間比率",
+      "availability": "前日／前週必須完整結束",
+      "risk": "當日最終高低不可提前使用",
+      "families": [
+        "structure",
+        "session"
+      ]
+    },
+    {
+      "column": "smc_swing_high_distance_atr",
+      "group": "swing_structure",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "確認擺動與結構方向",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "距離ATR、方向離散值",
+      "availability": "原SMC右側確認後再依原契約可用",
+      "risk": "相同名稱可能有不同確認延遲",
+      "families": [
+        "structure",
+        "chart_patterns"
+      ]
+    },
+    {
+      "column": "smc_swing_low_distance_atr",
+      "group": "swing_structure",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "確認擺動與結構方向",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "距離ATR、方向離散值",
+      "availability": "原SMC右側確認後再依原契約可用",
+      "risk": "相同名稱可能有不同確認延遲",
+      "families": [
+        "structure",
+        "chart_patterns"
+      ]
+    },
+    {
+      "column": "smc_structure_direction",
+      "group": "swing_structure",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "確認擺動與結構方向",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "距離ATR、方向離散值",
+      "availability": "原SMC右側確認後再依原契約可用",
+      "risk": "相同名稱可能有不同確認延遲",
+      "families": [
+        "structure",
+        "chart_patterns"
+      ]
+    },
+    {
+      "column": "higher_high",
+      "group": "swing_structure",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "確認擺動與結構方向",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "距離ATR、方向離散值",
+      "availability": "原SMC右側確認後再依原契約可用",
+      "risk": "相同名稱可能有不同確認延遲",
+      "families": [
+        "structure",
+        "chart_patterns"
+      ]
+    },
+    {
+      "column": "higher_low",
+      "group": "swing_structure",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "確認擺動與結構方向",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "距離ATR、方向離散值",
+      "availability": "原SMC右側確認後再依原契約可用",
+      "risk": "相同名稱可能有不同確認延遲",
+      "families": [
+        "structure",
+        "chart_patterns"
+      ]
+    },
+    {
+      "column": "donchian_breakout_up_20",
+      "group": "break_events",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "突破與結構改變事件",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "當棒事件與持續狀態分開",
+      "availability": "收盤確認；不得向前複製高週期訊號",
+      "risk": "多條事件可能同筆交易",
+      "families": [
+        "structure",
+        "breakout"
+      ]
+    },
+    {
+      "column": "donchian_breakout_down_20",
+      "group": "break_events",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "突破與結構改變事件",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "當棒事件與持續狀態分開",
+      "availability": "收盤確認；不得向前複製高週期訊號",
+      "risk": "多條事件可能同筆交易",
+      "families": [
+        "structure",
+        "breakout"
+      ]
+    },
+    {
+      "column": "breakout_20",
+      "group": "break_events",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "突破與結構改變事件",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "當棒事件與持續狀態分開",
+      "availability": "收盤確認；不得向前複製高週期訊號",
+      "risk": "多條事件可能同筆交易",
+      "families": [
+        "structure",
+        "breakout"
+      ]
+    },
+    {
+      "column": "smc_bos_up",
+      "group": "break_events",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "突破與結構改變事件",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "當棒事件與持續狀態分開",
+      "availability": "收盤確認；不得向前複製高週期訊號",
+      "risk": "多條事件可能同筆交易",
+      "families": [
+        "structure",
+        "breakout"
+      ]
+    },
+    {
+      "column": "smc_bos_down",
+      "group": "break_events",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "突破與結構改變事件",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "當棒事件與持續狀態分開",
+      "availability": "收盤確認；不得向前複製高週期訊號",
+      "risk": "多條事件可能同筆交易",
+      "families": [
+        "structure",
+        "breakout"
+      ]
+    },
+    {
+      "column": "smc_choch_up",
+      "group": "break_events",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "突破與結構改變事件",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "當棒事件與持續狀態分開",
+      "availability": "收盤確認；不得向前複製高週期訊號",
+      "risk": "多條事件可能同筆交易",
+      "families": [
+        "structure",
+        "breakout"
+      ]
+    },
+    {
+      "column": "smc_choch_down",
+      "group": "break_events",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "突破與結構改變事件",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "當棒事件與持續狀態分開",
+      "availability": "收盤確認；不得向前複製高週期訊號",
+      "risk": "多條事件可能同筆交易",
+      "families": [
+        "structure",
+        "breakout"
+      ]
+    },
+    {
+      "column": "smc_liquidity_sweep_high",
+      "group": "sweep_imbalance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "價格掃過與失衡區代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向與ATR",
+      "availability": "完整形態形成後",
+      "risk": "僅價格型態，不宣稱知道主力或未成交單",
+      "families": [
+        "structure"
+      ]
+    },
+    {
+      "column": "smc_liquidity_sweep_low",
+      "group": "sweep_imbalance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "價格掃過與失衡區代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向與ATR",
+      "availability": "完整形態形成後",
+      "risk": "僅價格型態，不宣稱知道主力或未成交單",
+      "families": [
+        "structure"
+      ]
+    },
+    {
+      "column": "smc_range_position_20",
+      "group": "sweep_imbalance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "價格掃過與失衡區代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向與ATR",
+      "availability": "完整形態形成後",
+      "risk": "僅價格型態，不宣稱知道主力或未成交單",
+      "families": [
+        "structure"
+      ]
+    },
+    {
+      "column": "smc_bullish_fvg_atr",
+      "group": "sweep_imbalance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "價格掃過與失衡區代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向與ATR",
+      "availability": "完整形態形成後",
+      "risk": "僅價格型態，不宣稱知道主力或未成交單",
+      "families": [
+        "structure"
+      ]
+    },
+    {
+      "column": "smc_bearish_fvg_atr",
+      "group": "sweep_imbalance",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "價格掃過與失衡區代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向與ATR",
+      "availability": "完整形態形成後",
+      "risk": "僅價格型態，不宣稱知道主力或未成交單",
+      "families": [
+        "structure"
+      ]
+    },
+    {
+      "column": "volume_change",
+      "group": "volume_level",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "相對成交量與異常",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "相對歷史均量或Z分數",
+      "availability": "當棒總量收盤後；分母定義另核對",
+      "risk": "不同市場成交量不可混用",
+      "families": [
+        "volume",
+        "pullback"
+      ]
+    },
+    {
+      "column": "relative_volume_20",
+      "group": "volume_level",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "相對成交量與異常",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "相對歷史均量或Z分數",
+      "availability": "當棒總量收盤後；分母定義另核對",
+      "risk": "不同市場成交量不可混用",
+      "families": [
+        "volume",
+        "pullback"
+      ]
+    },
+    {
+      "column": "volume_zscore_20",
+      "group": "volume_level",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "相對成交量與異常",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "相對歷史均量或Z分數",
+      "availability": "當棒總量收盤後；分母定義另核對",
+      "risk": "不同市場成交量不可混用",
+      "families": [
+        "volume",
+        "pullback"
+      ]
+    },
+    {
+      "column": "volume_oscillator_5_20",
+      "group": "volume_level",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "相對成交量與異常",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "相對歷史均量或Z分數",
+      "availability": "當棒總量收盤後；分母定義另核對",
+      "risk": "不同市場成交量不可混用",
+      "families": [
+        "volume",
+        "pullback"
+      ]
+    },
+    {
+      "column": "mfi_14",
+      "group": "volume_pressure",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "量價累積代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "有界量價比率／斜率",
+      "availability": "收盤後",
+      "risk": "不是帳戶資金流或主動買賣",
+      "families": [
+        "volume"
+      ]
+    },
+    {
+      "column": "cmf_20",
+      "group": "volume_pressure",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "量價累積代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "有界量價比率／斜率",
+      "availability": "收盤後",
+      "risk": "不是帳戶資金流或主動買賣",
+      "families": [
+        "volume"
+      ]
+    },
+    {
+      "column": "ad_line_slope_20",
+      "group": "volume_pressure",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "量價累積代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "有界量價比率／斜率",
+      "availability": "收盤後",
+      "risk": "不是帳戶資金流或主動買賣",
+      "families": [
+        "volume"
+      ]
+    },
+    {
+      "column": "obv_pressure_5",
+      "group": "volume_pressure",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "量價累積代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "有界量價比率／斜率",
+      "availability": "收盤後",
+      "risk": "不是帳戶資金流或主動買賣",
+      "families": [
+        "volume"
+      ]
+    },
+    {
+      "column": "rolling_vwap_gap_atr",
+      "group": "vwap_anchor",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "VWAP與錨定位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "ATR或價格比率",
+      "availability": "只累積到決策時，錨點須事前已知",
+      "risk": "K線近似VWAP與逐筆VWAP分開",
+      "families": [
+        "pullback",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "vwap_gap_20",
+      "group": "vwap_anchor",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "VWAP與錨定位置",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "ATR或價格比率",
+      "availability": "只累積到決策時，錨點須事前已知",
+      "risk": "K線近似VWAP與逐筆VWAP分開",
+      "families": [
+        "pullback",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "anchored_vwap_gap_candidate",
+      "group": "vwap_anchor",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "VWAP與錨定位置",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "ATR或價格比率",
+      "availability": "只累積到決策時，錨點須事前已知",
+      "risk": "K線近似VWAP與逐筆VWAP分開",
+      "families": [
+        "pullback",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "session_vwap_band_position_candidate",
+      "group": "vwap_anchor",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "VWAP與錨定位置",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "ATR或價格比率",
+      "availability": "只累積到決策時，錨點須事前已知",
+      "risk": "K線近似VWAP與逐筆VWAP分開",
+      "families": [
+        "pullback",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "taker_buy_ratio",
+      "group": "aggressor_flow",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "主動量差與CVD",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "同單位買賣量比例",
+      "availability": "棒級資料收盤可得；缺值遮罩",
+      "risk": "棒級代理不是逐價Footprint",
+      "families": [
+        "volume",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "volume_delta_ratio",
+      "group": "aggressor_flow",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "主動量差與CVD",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "同單位買賣量比例",
+      "availability": "棒級資料收盤可得；缺值遮罩",
+      "risk": "棒級代理不是逐價Footprint",
+      "families": [
+        "volume",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "cvd_pressure_20",
+      "group": "aggressor_flow",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "主動量差與CVD",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "同單位買賣量比例",
+      "availability": "棒級資料收盤可得；缺值遮罩",
+      "risk": "棒級代理不是逐價Footprint",
+      "families": [
+        "volume",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "trade_intensity_20",
+      "group": "trade_arrival",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "成交速度與大小",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "相對過去強度",
+      "availability": "逐筆或完整棒成交統計",
+      "risk": "交易筆數不是委託撤單數",
+      "families": [
+        "microstructure",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "average_trade_size_ratio_20",
+      "group": "trade_arrival",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "成交速度與大小",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "相對過去強度",
+      "availability": "逐筆或完整棒成交統計",
+      "risk": "交易筆數不是委託撤單數",
+      "families": [
+        "microstructure",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "large_trade_fraction_candidate",
+      "group": "trade_arrival",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "成交速度與大小",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "相對過去強度",
+      "availability": "逐筆或完整棒成交統計",
+      "risk": "交易筆數不是委託撤單數",
+      "families": [
+        "microstructure",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "amihud_20",
+      "group": "liquidity_cost",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "流動性與成本尺度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "價格比例、ATR成本比",
+      "availability": "決策前有效bid/ask與深度",
+      "risk": "收盤代理不能替代真實可成交深度",
+      "families": [
+        "microstructure",
+        "relative"
+      ]
+    },
+    {
+      "column": "spread_fraction",
+      "group": "liquidity_cost",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "流動性與成本尺度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "價格比例、ATR成本比",
+      "availability": "決策前有效bid/ask與深度",
+      "risk": "收盤代理不能替代真實可成交深度",
+      "families": [
+        "microstructure",
+        "relative"
+      ]
+    },
+    {
+      "column": "spread_to_atr_candidate",
+      "group": "liquidity_cost",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "流動性與成本尺度",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "價格比例、ATR成本比",
+      "availability": "決策前有效bid/ask與深度",
+      "risk": "收盤代理不能替代真實可成交深度",
+      "families": [
+        "microstructure",
+        "relative"
+      ]
+    },
+    {
+      "column": "depth_imbalance_candidate",
+      "group": "liquidity_cost",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "流動性與成本尺度",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "價格比例、ATR成本比",
+      "availability": "決策前有效bid/ask與深度",
+      "risk": "收盤代理不能替代真實可成交深度",
+      "families": [
+        "microstructure",
+        "relative"
+      ]
+    },
+    {
+      "column": "book_replenishment_candidate",
+      "group": "depth_dynamics",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "訂單簿補單與撤單",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "深度或時間尺度",
+      "availability": "完整序號的L2增量與接收時間",
+      "risk": "本群待補事件資料，不能用K線推定",
+      "families": [
+        "microstructure",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "cancel_intensity_candidate",
+      "group": "depth_dynamics",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "訂單簿補單與撤單",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "深度或時間尺度",
+      "availability": "完整序號的L2增量與接收時間",
+      "risk": "本群待補事件資料，不能用K線推定",
+      "families": [
+        "microstructure",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "microprice_gap_candidate",
+      "group": "depth_dynamics",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "訂單簿補單與撤單",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "深度或時間尺度",
+      "availability": "完整序號的L2增量與接收時間",
+      "risk": "本群待補事件資料，不能用K線推定",
+      "families": [
+        "microstructure",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "order_flow_imbalance_candidate",
+      "group": "depth_dynamics",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "訂單簿補單與撤單",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "深度或時間尺度",
+      "availability": "完整序號的L2增量與接收時間",
+      "risk": "本群待補事件資料，不能用K線推定",
+      "families": [
+        "microstructure",
+        "auction_extended"
+      ]
+    },
+    {
+      "column": "funding_rate",
+      "group": "funding",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "資金費與相對極端",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "有符號費率、歷史排名、剩餘時間",
+      "availability": "區分已公布預估與結算後實際費率",
+      "risk": "歷史實際費可作帳務，不一定可提前作預測",
+      "families": [
+        "derivatives",
+        "relative"
+      ]
+    },
+    {
+      "column": "funding_percentile_200",
+      "group": "funding",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "資金費與相對極端",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "有符號費率、歷史排名、剩餘時間",
+      "availability": "區分已公布預估與結算後實際費率",
+      "risk": "歷史實際費可作帳務，不一定可提前作預測",
+      "families": [
+        "derivatives",
+        "relative"
+      ]
+    },
+    {
+      "column": "funding_zscore_200",
+      "group": "funding",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "資金費與相對極端",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "有符號費率、歷史排名、剩餘時間",
+      "availability": "區分已公布預估與結算後實際費率",
+      "risk": "歷史實際費可作帳務，不一定可提前作預測",
+      "families": [
+        "derivatives",
+        "relative"
+      ]
+    },
+    {
+      "column": "minutes_to_funding_ratio",
+      "group": "funding",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "資金費與相對極端",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "有符號費率、歷史排名、剩餘時間",
+      "availability": "區分已公布預估與結算後實際費率",
+      "risk": "歷史實際費可作帳務，不一定可提前作預測",
+      "families": [
+        "derivatives",
+        "relative"
+      ]
+    },
+    {
+      "column": "open_interest_change_1",
+      "group": "open_interest",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "持倉量與槓桿活動代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "相對變化，不用絕對市值",
+      "availability": "來源公布後backward as-of",
+      "risk": "OI不識別多空方向，歷史覆蓋未證明",
+      "families": [
+        "derivatives"
+      ]
+    },
+    {
+      "column": "open_interest_change",
+      "group": "open_interest",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "持倉量與槓桿活動代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "相對變化，不用絕對市值",
+      "availability": "來源公布後backward as-of",
+      "risk": "OI不識別多空方向，歷史覆蓋未證明",
+      "families": [
+        "derivatives"
+      ]
+    },
+    {
+      "column": "open_interest_zscore_50",
+      "group": "open_interest",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "持倉量與槓桿活動代理",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "相對變化，不用絕對市值",
+      "availability": "來源公布後backward as-of",
+      "risk": "OI不識別多空方向，歷史覆蓋未證明",
+      "families": [
+        "derivatives"
+      ]
+    },
+    {
+      "column": "oi_price_joint_state_candidate",
+      "group": "open_interest",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "持倉量與槓桿活動代理",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "相對變化，不用絕對市值",
+      "availability": "來源公布後backward as-of",
+      "risk": "OI不識別多空方向，歷史覆蓋未證明",
+      "families": [
+        "derivatives"
+      ]
+    },
+    {
+      "column": "basis_rate",
+      "group": "basis_premium",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "基差與溢價",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "同時間同商品比例",
+      "availability": "各來源時間與可交易性一致",
+      "risk": "mark不可成交；跨所接收延遲可能是假訊號",
+      "families": [
+        "derivatives",
+        "carry_extended"
+      ]
+    },
+    {
+      "column": "premium_index_candidate",
+      "group": "basis_premium",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "基差與溢價",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "同時間同商品比例",
+      "availability": "各來源時間與可交易性一致",
+      "risk": "mark不可成交；跨所接收延遲可能是假訊號",
+      "families": [
+        "derivatives",
+        "carry_extended"
+      ]
+    },
+    {
+      "column": "mark_index_gap_candidate",
+      "group": "basis_premium",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "基差與溢價",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "同時間同商品比例",
+      "availability": "各來源時間與可交易性一致",
+      "risk": "mark不可成交；跨所接收延遲可能是假訊號",
+      "families": [
+        "derivatives",
+        "carry_extended"
+      ]
+    },
+    {
+      "column": "term_slope_candidate",
+      "group": "basis_premium",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "基差與溢價",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "同時間同商品比例",
+      "availability": "各來源時間與可交易性一致",
+      "risk": "mark不可成交；跨所接收延遲可能是假訊號",
+      "families": [
+        "derivatives",
+        "carry_extended"
+      ]
+    },
+    {
+      "column": "liquidation_long_volume_candidate",
+      "group": "liquidation",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "清算與擁擠代理",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "按成交量或OI尺度",
+      "availability": "只使用當時收到的事件",
+      "risk": "清算資料可能抽樣；帳戶比率不是持倉比例",
+      "families": [
+        "derivatives"
+      ]
+    },
+    {
+      "column": "liquidation_short_volume_candidate",
+      "group": "liquidation",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "清算與擁擠代理",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "按成交量或OI尺度",
+      "availability": "只使用當時收到的事件",
+      "risk": "清算資料可能抽樣；帳戶比率不是持倉比例",
+      "families": [
+        "derivatives"
+      ]
+    },
+    {
+      "column": "long_short_ratio_candidate",
+      "group": "liquidation",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "清算與擁擠代理",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "按成交量或OI尺度",
+      "availability": "只使用當時收到的事件",
+      "risk": "清算資料可能抽樣；帳戶比率不是持倉比例",
+      "families": [
+        "derivatives"
+      ]
+    },
+    {
+      "column": "hour_sin",
+      "group": "clock_session",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "時鐘與交易時段",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "週期編碼與二元狀態",
+      "availability": "事前已知日曆，UTC與DST明確",
+      "risk": "未經資料證明不能把時段當必然優勢",
+      "families": [
+        "session",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "hour_cos",
+      "group": "clock_session",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "時鐘與交易時段",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "週期編碼與二元狀態",
+      "availability": "事前已知日曆，UTC與DST明確",
+      "risk": "未經資料證明不能把時段當必然優勢",
+      "families": [
+        "session",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "weekday_sin",
+      "group": "clock_session",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "時鐘與交易時段",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "週期編碼與二元狀態",
+      "availability": "事前已知日曆，UTC與DST明確",
+      "risk": "未經資料證明不能把時段當必然優勢",
+      "families": [
+        "session",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "weekday_cos",
+      "group": "clock_session",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "時鐘與交易時段",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "週期編碼與二元狀態",
+      "availability": "事前已知日曆，UTC與DST明確",
+      "risk": "未經資料證明不能把時段當必然優勢",
+      "families": [
+        "session",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "is_weekend",
+      "group": "clock_session",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "時鐘與交易時段",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "週期編碼與二元狀態",
+      "availability": "事前已知日曆，UTC與DST明確",
+      "risk": "未經資料證明不能把時段當必然優勢",
+      "families": [
+        "session",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "asia_session",
+      "group": "clock_session",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "時鐘與交易時段",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "週期編碼與二元狀態",
+      "availability": "事前已知日曆，UTC與DST明確",
+      "risk": "未經資料證明不能把時段當必然優勢",
+      "families": [
+        "session",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "europe_session",
+      "group": "clock_session",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "時鐘與交易時段",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "週期編碼與二元狀態",
+      "availability": "事前已知日曆，UTC與DST明確",
+      "risk": "未經資料證明不能把時段當必然優勢",
+      "families": [
+        "session",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "us_session",
+      "group": "clock_session",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "時鐘與交易時段",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "週期編碼與二元狀態",
+      "availability": "事前已知日曆，UTC與DST明確",
+      "risk": "未經資料證明不能把時段當必然優勢",
+      "families": [
+        "session",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "market_trend_consensus",
+      "group": "cross_timeframe",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨週期共識與衝突",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向分布、分歧及熵",
+      "availability": "每個來源週期都已收盤",
+      "risk": "分歧是資訊，不應強迫所有週期同向",
+      "families": [
+        "trend",
+        "pullback",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "market_fast_trend",
+      "group": "cross_timeframe",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨週期共識與衝突",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向分布、分歧及熵",
+      "availability": "每個來源週期都已收盤",
+      "risk": "分歧是資訊，不應強迫所有週期同向",
+      "families": [
+        "trend",
+        "pullback",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "market_slow_trend",
+      "group": "cross_timeframe",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨週期共識與衝突",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向分布、分歧及熵",
+      "availability": "每個來源週期都已收盤",
+      "risk": "分歧是資訊，不應強迫所有週期同向",
+      "families": [
+        "trend",
+        "pullback",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "market_cross_timeframe_disagreement",
+      "group": "cross_timeframe",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨週期共識與衝突",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向分布、分歧及熵",
+      "availability": "每個來源週期都已收盤",
+      "risk": "分歧是資訊，不應強迫所有週期同向",
+      "families": [
+        "trend",
+        "pullback",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "market_direction_entropy",
+      "group": "cross_timeframe",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨週期共識與衝突",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向分布、分歧及熵",
+      "availability": "每個來源週期都已收盤",
+      "risk": "分歧是資訊，不應強迫所有週期同向",
+      "families": [
+        "trend",
+        "pullback",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "market_reversal_pressure",
+      "group": "cross_timeframe",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨週期共識與衝突",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向分布、分歧及熵",
+      "availability": "每個來源週期都已收盤",
+      "risk": "分歧是資訊，不應強迫所有週期同向",
+      "families": [
+        "trend",
+        "pullback",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "market_trend_reversal_conflict",
+      "group": "cross_timeframe",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨週期共識與衝突",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向分布、分歧及熵",
+      "availability": "每個來源週期都已收盤",
+      "risk": "分歧是資訊，不應強迫所有週期同向",
+      "families": [
+        "trend",
+        "pullback",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "market_fast_slow_conflict",
+      "group": "cross_timeframe",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨週期共識與衝突",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "方向分布、分歧及熵",
+      "availability": "每個來源週期都已收盤",
+      "risk": "分歧是資訊，不應強迫所有週期同向",
+      "families": [
+        "trend",
+        "pullback",
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "kalman_innovation_candidate",
+      "group": "statistical_state",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "統計狀態與估計信心",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只用過去估計的尺度",
+      "availability": "只能filtered，不能smoothed或事後分段",
+      "risk": "新增模型也需樣本外估計，不能用全資料擬合",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "ou_half_life_candidate",
+      "group": "statistical_state",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "統計狀態與估計信心",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只用過去估計的尺度",
+      "availability": "只能filtered，不能smoothed或事後分段",
+      "risk": "新增模型也需樣本外估計，不能用全資料擬合",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "filtered_regime_probability_candidate",
+      "group": "statistical_state",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "統計狀態與估計信心",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只用過去估計的尺度",
+      "availability": "只能filtered，不能smoothed或事後分段",
+      "risk": "新增模型也需樣本外估計，不能用全資料擬合",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "change_point_probability_candidate",
+      "group": "statistical_state",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "統計狀態與估計信心",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只用過去估計的尺度",
+      "availability": "只能filtered，不能smoothed或事後分段",
+      "risk": "新增模型也需樣本外估計，不能用全資料擬合",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "pair_spread_zscore_candidate",
+      "group": "relative_crossasset",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨資產價差與領先",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "訓練窗比率與因子殘差",
+      "availability": "同步且歷史可交易名單",
+      "risk": "接收延遲與存活偏差",
+      "families": [
+        "relative",
+        "carry_extended"
+      ]
+    },
+    {
+      "column": "hedge_ratio_candidate",
+      "group": "relative_crossasset",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨資產價差與領先",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "訓練窗比率與因子殘差",
+      "availability": "同步且歷史可交易名單",
+      "risk": "接收延遲與存活偏差",
+      "families": [
+        "relative",
+        "carry_extended"
+      ]
+    },
+    {
+      "column": "cross_asset_lead_lag_candidate",
+      "group": "relative_crossasset",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨資產價差與領先",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "訓練窗比率與因子殘差",
+      "availability": "同步且歷史可交易名單",
+      "risk": "接收延遲與存活偏差",
+      "families": [
+        "relative",
+        "carry_extended"
+      ]
+    },
+    {
+      "column": "breadth_available",
+      "group": "relative_crossasset",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "跨資產價差與領先",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "訓練窗比率與因子殘差",
+      "availability": "同步且歷史可交易名單",
+      "risk": "接收延遲與存活偏差",
+      "families": [
+        "relative",
+        "carry_extended"
+      ]
+    },
+    {
+      "column": "sentiment_score",
+      "group": "news_macro",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "新聞／宏觀／鏈上發布",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只用訓練窗尺度及發布前共識",
+      "availability": "首次可得時間，不用修訂版本回填",
+      "risk": "此處列欄位候選，不代表資料或FinBERT已接通",
+      "families": [
+        "external",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "macro_surprise_candidate",
+      "group": "news_macro",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "新聞／宏觀／鏈上發布",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只用訓練窗尺度及發布前共識",
+      "availability": "首次可得時間，不用修訂版本回填",
+      "risk": "此處列欄位候選，不代表資料或FinBERT已接通",
+      "families": [
+        "external",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "etf_flow_surprise_candidate",
+      "group": "news_macro",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "新聞／宏觀／鏈上發布",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只用訓練窗尺度及發布前共識",
+      "availability": "首次可得時間，不用修訂版本回填",
+      "risk": "此處列欄位候選，不代表資料或FinBERT已接通",
+      "families": [
+        "external",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "exchange_netflow_candidate",
+      "group": "news_macro",
+      "role": "market",
+      "transformer": true,
+      "sac": true,
+      "reason": "決策時可得、特徵契約相容、資料覆蓋通過；不是自動啟用",
+      "group_name": "新聞／宏觀／鏈上發布",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只用訓練窗尺度及發布前共識",
+      "availability": "首次可得時間，不用修訂版本回填",
+      "risk": "此處列欄位候選，不代表資料或FinBERT已接通",
+      "families": [
+        "external",
+        "event_extended"
+      ]
+    },
+    {
+      "column": "microstructure_available",
+      "group": "availability",
+      "role": "quality",
+      "transformer": true,
+      "sac": true,
+      "reason": "缺值不等於零或中性，遮罩須和原始欄位一起驗證",
+      "group_name": "可用性與資料新鮮度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "遮罩與非負資料年齡",
+      "availability": "決策時可測得",
+      "risk": "缺失填零必須保留遮罩，不得當安全市場",
+      "families": [
+        "microstructure",
+        "derivatives",
+        "external"
+      ]
+    },
+    {
+      "column": "derivatives_available",
+      "group": "availability",
+      "role": "quality",
+      "transformer": true,
+      "sac": true,
+      "reason": "缺值不等於零或中性，遮罩須和原始欄位一起驗證",
+      "group_name": "可用性與資料新鮮度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "遮罩與非負資料年齡",
+      "availability": "決策時可測得",
+      "risk": "缺失填零必須保留遮罩，不得當安全市場",
+      "families": [
+        "microstructure",
+        "derivatives",
+        "external"
+      ]
+    },
+    {
+      "column": "funding_available",
+      "group": "availability",
+      "role": "quality",
+      "transformer": true,
+      "sac": true,
+      "reason": "缺值不等於零或中性，遮罩須和原始欄位一起驗證",
+      "group_name": "可用性與資料新鮮度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "遮罩與非負資料年齡",
+      "availability": "決策時可測得",
+      "risk": "缺失填零必須保留遮罩，不得當安全市場",
+      "families": [
+        "microstructure",
+        "derivatives",
+        "external"
+      ]
+    },
+    {
+      "column": "open_interest_available",
+      "group": "availability",
+      "role": "quality",
+      "transformer": true,
+      "sac": true,
+      "reason": "缺值不等於零或中性，遮罩須和原始欄位一起驗證",
+      "group_name": "可用性與資料新鮮度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "遮罩與非負資料年齡",
+      "availability": "決策時可測得",
+      "risk": "缺失填零必須保留遮罩，不得當安全市場",
+      "families": [
+        "microstructure",
+        "derivatives",
+        "external"
+      ]
+    },
+    {
+      "column": "spread_available",
+      "group": "availability",
+      "role": "quality",
+      "transformer": true,
+      "sac": true,
+      "reason": "缺值不等於零或中性，遮罩須和原始欄位一起驗證",
+      "group_name": "可用性與資料新鮮度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "遮罩與非負資料年齡",
+      "availability": "決策時可測得",
+      "risk": "缺失填零必須保留遮罩，不得當安全市場",
+      "families": [
+        "microstructure",
+        "derivatives",
+        "external"
+      ]
+    },
+    {
+      "column": "market_timeframe_coverage",
+      "group": "availability",
+      "role": "quality",
+      "transformer": true,
+      "sac": true,
+      "reason": "缺值不等於零或中性，遮罩須和原始欄位一起驗證",
+      "group_name": "可用性與資料新鮮度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "遮罩與非負資料年齡",
+      "availability": "決策時可測得",
+      "risk": "缺失填零必須保留遮罩，不得當安全市場",
+      "families": [
+        "microstructure",
+        "derivatives",
+        "external"
+      ]
+    },
+    {
+      "column": "orderbook_available",
+      "group": "availability",
+      "role": "quality",
+      "transformer": true,
+      "sac": true,
+      "reason": "缺值不等於零或中性，遮罩須和原始欄位一起驗證",
+      "group_name": "可用性與資料新鮮度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "遮罩與非負資料年齡",
+      "availability": "決策時可測得",
+      "risk": "缺失填零必須保留遮罩，不得當安全市場",
+      "families": [
+        "microstructure",
+        "derivatives",
+        "external"
+      ]
+    },
+    {
+      "column": "orderbook_age_days",
+      "group": "availability",
+      "role": "quality",
+      "transformer": true,
+      "sac": true,
+      "reason": "缺值不等於零或中性，遮罩須和原始欄位一起驗證",
+      "group_name": "可用性與資料新鮮度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "遮罩與非負資料年齡",
+      "availability": "決策時可測得",
+      "risk": "缺失填零必須保留遮罩，不得當安全市場",
+      "families": [
+        "microstructure",
+        "derivatives",
+        "external"
+      ]
+    },
+    {
+      "column": "derivatives_age_days",
+      "group": "availability",
+      "role": "quality",
+      "transformer": true,
+      "sac": true,
+      "reason": "缺值不等於零或中性，遮罩須和原始欄位一起驗證",
+      "group_name": "可用性與資料新鮮度",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "遮罩與非負資料年齡",
+      "availability": "決策時可測得",
+      "risk": "缺失填零必須保留遮罩，不得當安全市場",
+      "families": [
+        "microstructure",
+        "derivatives",
+        "external"
+      ]
+    },
+    {
+      "column": "candidate_strategy_id_candidate",
+      "group": "candidate_contract",
+      "role": "contract",
+      "transformer": true,
+      "sac": true,
+      "reason": "事前固定條件，不得以事後最佳方向或停利替代",
+      "group_name": "候選身分與風險條件",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "版本化類別與比例",
+      "availability": "進場前固定",
+      "risk": "計畫盈虧比不是事後實現盈虧比",
+      "families": [
+        "public_code",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "candidate_side_candidate",
+      "group": "candidate_contract",
+      "role": "contract",
+      "transformer": true,
+      "sac": true,
+      "reason": "事前固定條件，不得以事後最佳方向或停利替代",
+      "group_name": "候選身分與風險條件",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "版本化類別與比例",
+      "availability": "進場前固定",
+      "risk": "計畫盈虧比不是事後實現盈虧比",
+      "families": [
+        "public_code",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "planned_stop_atr_candidate",
+      "group": "candidate_contract",
+      "role": "contract",
+      "transformer": true,
+      "sac": true,
+      "reason": "事前固定條件，不得以事後最佳方向或停利替代",
+      "group_name": "候選身分與風險條件",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "版本化類別與比例",
+      "availability": "進場前固定",
+      "risk": "計畫盈虧比不是事後實現盈虧比",
+      "families": [
+        "public_code",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "planned_reward_risk_candidate",
+      "group": "candidate_contract",
+      "role": "contract",
+      "transformer": true,
+      "sac": true,
+      "reason": "事前固定條件，不得以事後最佳方向或停利替代",
+      "group_name": "候選身分與風險條件",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "版本化類別與比例",
+      "availability": "進場前固定",
+      "risk": "計畫盈虧比不是事後實現盈虧比",
+      "families": [
+        "public_code",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "planned_holding_bars_candidate",
+      "group": "candidate_contract",
+      "role": "contract",
+      "transformer": true,
+      "sac": true,
+      "reason": "事前固定條件，不得以事後最佳方向或停利替代",
+      "group_name": "候選身分與風險條件",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "版本化類別與比例",
+      "availability": "進場前固定",
+      "risk": "計畫盈虧比不是事後實現盈虧比",
+      "families": [
+        "public_code",
+        "named_systems"
+      ]
+    },
+    {
+      "column": "transformer_return_1",
+      "group": "transformer_oos",
+      "role": "oos",
+      "transformer": false,
+      "sac": true,
+      "reason": "必須附checkpoint、horizon、OOS時間及校準證據；禁止Transformer自吃輸出",
+      "group_name": "Transformer樣本外分析輸出",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依保存horizon、校準與單位契約",
+      "availability": "合法樣本外預測且早於SAC決策",
+      "risk": "禁止Transformer自身輸入循環或訓練內預測給SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "transformer_return_5",
+      "group": "transformer_oos",
+      "role": "oos",
+      "transformer": false,
+      "sac": true,
+      "reason": "必須附checkpoint、horizon、OOS時間及校準證據；禁止Transformer自吃輸出",
+      "group_name": "Transformer樣本外分析輸出",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依保存horizon、校準與單位契約",
+      "availability": "合法樣本外預測且早於SAC決策",
+      "risk": "禁止Transformer自身輸入循環或訓練內預測給SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "transformer_return_20",
+      "group": "transformer_oos",
+      "role": "oos",
+      "transformer": false,
+      "sac": true,
+      "reason": "必須附checkpoint、horizon、OOS時間及校準證據；禁止Transformer自吃輸出",
+      "group_name": "Transformer樣本外分析輸出",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依保存horizon、校準與單位契約",
+      "availability": "合法樣本外預測且早於SAC決策",
+      "risk": "禁止Transformer自身輸入循環或訓練內預測給SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "transformer_volatility",
+      "group": "transformer_oos",
+      "role": "oos",
+      "transformer": false,
+      "sac": true,
+      "reason": "必須附checkpoint、horizon、OOS時間及校準證據；禁止Transformer自吃輸出",
+      "group_name": "Transformer樣本外分析輸出",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依保存horizon、校準與單位契約",
+      "availability": "合法樣本外預測且早於SAC決策",
+      "risk": "禁止Transformer自身輸入循環或訓練內預測給SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "transformer_uncertainty",
+      "group": "transformer_oos",
+      "role": "oos",
+      "transformer": false,
+      "sac": true,
+      "reason": "必須附checkpoint、horizon、OOS時間及校準證據；禁止Transformer自吃輸出",
+      "group_name": "Transformer樣本外分析輸出",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依保存horizon、校準與單位契約",
+      "availability": "合法樣本外預測且早於SAC決策",
+      "risk": "禁止Transformer自身輸入循環或訓練內預測給SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "transformer_bull_probability",
+      "group": "transformer_oos",
+      "role": "oos",
+      "transformer": false,
+      "sac": true,
+      "reason": "必須附checkpoint、horizon、OOS時間及校準證據；禁止Transformer自吃輸出",
+      "group_name": "Transformer樣本外分析輸出",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依保存horizon、校準與單位契約",
+      "availability": "合法樣本外預測且早於SAC決策",
+      "risk": "禁止Transformer自身輸入循環或訓練內預測給SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "transformer_bear_probability",
+      "group": "transformer_oos",
+      "role": "oos",
+      "transformer": false,
+      "sac": true,
+      "reason": "必須附checkpoint、horizon、OOS時間及校準證據；禁止Transformer自吃輸出",
+      "group_name": "Transformer樣本外分析輸出",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依保存horizon、校準與單位契約",
+      "availability": "合法樣本外預測且早於SAC決策",
+      "risk": "禁止Transformer自身輸入循環或訓練內預測給SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "transformer_available",
+      "group": "transformer_oos",
+      "role": "oos",
+      "transformer": false,
+      "sac": true,
+      "reason": "必須附checkpoint、horizon、OOS時間及校準證據；禁止Transformer自吃輸出",
+      "group_name": "Transformer樣本外分析輸出",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依保存horizon、校準與單位契約",
+      "availability": "合法樣本外預測且早於SAC決策",
+      "risk": "禁止Transformer自身輸入循環或訓練內預測給SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "expected_return",
+      "group": "transformer_oos",
+      "role": "oos",
+      "transformer": false,
+      "sac": true,
+      "reason": "必須附checkpoint、horizon、OOS時間及校準證據；禁止Transformer自吃輸出",
+      "group_name": "Transformer樣本外分析輸出",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "依保存horizon、校準與單位契約",
+      "availability": "合法樣本外預測且早於SAC決策",
+      "risk": "禁止Transformer自身輸入循環或訓練內預測給SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "position_fraction_candidate",
+      "group": "position_state",
+      "role": "portfolio",
+      "transformer": false,
+      "sac": true,
+      "reason": "本研究分工為SAC狀態；需與真實帳戶/模擬事件時間一致",
+      "group_name": "部位與持有狀態",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "權益比例與事前風險尺度",
+      "availability": "決策前帳戶快照",
+      "risk": "既有環境有部分觀測但不是同名CSV欄；不可假稱已對接",
+      "families": [
+        "relative",
+        "microstructure"
+      ]
+    },
+    {
+      "column": "unrealized_return_candidate",
+      "group": "position_state",
+      "role": "portfolio",
+      "transformer": false,
+      "sac": true,
+      "reason": "本研究分工為SAC狀態；需與真實帳戶/模擬事件時間一致",
+      "group_name": "部位與持有狀態",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "權益比例與事前風險尺度",
+      "availability": "決策前帳戶快照",
+      "risk": "既有環境有部分觀測但不是同名CSV欄；不可假稱已對接",
+      "families": [
+        "relative",
+        "microstructure"
+      ]
+    },
+    {
+      "column": "holding_bars_ratio_candidate",
+      "group": "position_state",
+      "role": "portfolio",
+      "transformer": false,
+      "sac": true,
+      "reason": "本研究分工為SAC狀態；需與真實帳戶/模擬事件時間一致",
+      "group_name": "部位與持有狀態",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "權益比例與事前風險尺度",
+      "availability": "決策前帳戶快照",
+      "risk": "既有環境有部分觀測但不是同名CSV欄；不可假稱已對接",
+      "families": [
+        "relative",
+        "microstructure"
+      ]
+    },
+    {
+      "column": "distance_to_stop_candidate",
+      "group": "position_state",
+      "role": "portfolio",
+      "transformer": false,
+      "sac": true,
+      "reason": "本研究分工為SAC狀態；需與真實帳戶/模擬事件時間一致",
+      "group_name": "部位與持有狀態",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "權益比例與事前風險尺度",
+      "availability": "決策前帳戶快照",
+      "risk": "既有環境有部分觀測但不是同名CSV欄；不可假稱已對接",
+      "families": [
+        "relative",
+        "microstructure"
+      ]
+    },
+    {
+      "column": "drawdown_fraction_candidate",
+      "group": "risk_budget",
+      "role": "portfolio",
+      "transformer": false,
+      "sac": true,
+      "reason": "本研究分工為SAC狀態；需與真實帳戶/模擬事件時間一致",
+      "group_name": "風險預算與曝險",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "當前權益或核准限額",
+      "availability": "決策前，獨立風控仍保留否決權",
+      "risk": "模型不能自行提高硬性風險上限",
+      "families": [
+        "carry_extended",
+        "options"
+      ]
+    },
+    {
+      "column": "daily_loss_remaining_candidate",
+      "group": "risk_budget",
+      "role": "portfolio",
+      "transformer": false,
+      "sac": true,
+      "reason": "本研究分工為SAC狀態；需與真實帳戶/模擬事件時間一致",
+      "group_name": "風險預算與曝險",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "當前權益或核准限額",
+      "availability": "決策前，獨立風控仍保留否決權",
+      "risk": "模型不能自行提高硬性風險上限",
+      "families": [
+        "carry_extended",
+        "options"
+      ]
+    },
+    {
+      "column": "margin_buffer_candidate",
+      "group": "risk_budget",
+      "role": "portfolio",
+      "transformer": false,
+      "sac": true,
+      "reason": "本研究分工為SAC狀態；需與真實帳戶/模擬事件時間一致",
+      "group_name": "風險預算與曝險",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "當前權益或核准限額",
+      "availability": "決策前，獨立風控仍保留否決權",
+      "risk": "模型不能自行提高硬性風險上限",
+      "families": [
+        "carry_extended",
+        "options"
+      ]
+    },
+    {
+      "column": "net_exposure_candidate",
+      "group": "risk_budget",
+      "role": "portfolio",
+      "transformer": false,
+      "sac": true,
+      "reason": "本研究分工為SAC狀態；需與真實帳戶/模擬事件時間一致",
+      "group_name": "風險預算與曝險",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "當前權益或核准限額",
+      "availability": "決策前，獨立風控仍保留否決權",
+      "risk": "模型不能自行提高硬性風險上限",
+      "families": [
+        "carry_extended",
+        "options"
+      ]
+    },
+    {
+      "column": "gross_exposure_candidate",
+      "group": "risk_budget",
+      "role": "portfolio",
+      "transformer": false,
+      "sac": true,
+      "reason": "本研究分工為SAC狀態；需與真實帳戶/模擬事件時間一致",
+      "group_name": "風險預算與曝險",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "當前權益或核准限額",
+      "availability": "決策前，獨立風控仍保留否決權",
+      "risk": "模型不能自行提高硬性風險上限",
+      "families": [
+        "carry_extended",
+        "options"
+      ]
+    },
+    {
+      "column": "realized_slippage_bps_candidate",
+      "group": "execution_diagnostic",
+      "role": "execution",
+      "transformer": false,
+      "sac": false,
+      "reason": "本版不作模型輸入；事後成交品質不得回流當筆決策",
+      "group_name": "成交與營運品質",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只供診斷；未來若用延遲版本必須新契約",
+      "availability": "下單或成交後",
+      "risk": "當筆成交後資訊不能預測當筆進場",
+      "families": [
+        "microstructure"
+      ]
+    },
+    {
+      "column": "fill_ratio_candidate",
+      "group": "execution_diagnostic",
+      "role": "execution",
+      "transformer": false,
+      "sac": false,
+      "reason": "本版不作模型輸入；事後成交品質不得回流當筆決策",
+      "group_name": "成交與營運品質",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只供診斷；未來若用延遲版本必須新契約",
+      "availability": "下單或成交後",
+      "risk": "當筆成交後資訊不能預測當筆進場",
+      "families": [
+        "microstructure"
+      ]
+    },
+    {
+      "column": "order_latency_ms_candidate",
+      "group": "execution_diagnostic",
+      "role": "execution",
+      "transformer": false,
+      "sac": false,
+      "reason": "本版不作模型輸入；事後成交品質不得回流當筆決策",
+      "group_name": "成交與營運品質",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只供診斷；未來若用延遲版本必須新契約",
+      "availability": "下單或成交後",
+      "risk": "當筆成交後資訊不能預測當筆進場",
+      "families": [
+        "microstructure"
+      ]
+    },
+    {
+      "column": "reconnect_count_candidate",
+      "group": "execution_diagnostic",
+      "role": "execution",
+      "transformer": false,
+      "sac": false,
+      "reason": "本版不作模型輸入；事後成交品質不得回流當筆決策",
+      "group_name": "成交與營運品質",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "只供診斷；未來若用延遲版本必須新契約",
+      "availability": "下單或成交後",
+      "risk": "當筆成交後資訊不能預測當筆進場",
+      "families": [
+        "microstructure"
+      ]
+    },
+    {
+      "column": "future_return",
+      "group": "future_labels",
+      "role": "label",
+      "transformer": false,
+      "sac": false,
+      "reason": "欄位名稱包含事後資訊識別字：future",
+      "group_name": "未來答案與交易後路徑",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依交易契約與標籤結束時間",
+      "availability": "持倉結束及觀察窗結束之後",
+      "risk": "只能當標籤或診斷，不可輸入Transformer或SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "target",
+      "group": "future_labels",
+      "role": "label",
+      "transformer": false,
+      "sac": false,
+      "reason": "欄位是資料切分、標籤或預測目標",
+      "group_name": "未來答案與交易後路徑",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依交易契約與標籤結束時間",
+      "availability": "持倉結束及觀察窗結束之後",
+      "risk": "只能當標籤或診斷，不可輸入Transformer或SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "target_timestamp",
+      "group": "future_labels",
+      "role": "label",
+      "transformer": false,
+      "sac": false,
+      "reason": "欄位是資料切分、標籤或預測目標",
+      "group_name": "未來答案與交易後路徑",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "依交易契約與標籤結束時間",
+      "availability": "持倉結束及觀察窗結束之後",
+      "risk": "只能當標籤或診斷，不可輸入Transformer或SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "max_favorable_excursion",
+      "group": "future_labels",
+      "role": "label",
+      "transformer": false,
+      "sac": false,
+      "reason": "欄位是交易後才能確認的結果",
+      "group_name": "未來答案與交易後路徑",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "依交易契約與標籤結束時間",
+      "availability": "持倉結束及觀察窗結束之後",
+      "risk": "只能當標籤或診斷，不可輸入Transformer或SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "max_adverse_excursion",
+      "group": "future_labels",
+      "role": "label",
+      "transformer": false,
+      "sac": false,
+      "reason": "欄位是交易後才能確認的結果",
+      "group_name": "未來答案與交易後路徑",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "依交易契約與標籤結束時間",
+      "availability": "持倉結束及觀察窗結束之後",
+      "risk": "只能當標籤或診斷，不可輸入Transformer或SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "take_profit_hit",
+      "group": "future_labels",
+      "role": "label",
+      "transformer": false,
+      "sac": false,
+      "reason": "欄位是交易後才能確認的結果",
+      "group_name": "未來答案與交易後路徑",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "依交易契約與標籤結束時間",
+      "availability": "持倉結束及觀察窗結束之後",
+      "risk": "只能當標籤或診斷，不可輸入Transformer或SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "stop_loss_hit",
+      "group": "future_labels",
+      "role": "label",
+      "transformer": false,
+      "sac": false,
+      "reason": "欄位是交易後才能確認的結果",
+      "group_name": "未來答案與交易後路徑",
+      "source_status": "未找到同名字串，候選或動態／內部狀態待核對",
+      "normalize": "依交易契約與標籤結束時間",
+      "availability": "持倉結束及觀察窗結束之後",
+      "risk": "只能當標籤或診斷，不可輸入Transformer或SAC",
+      "families": [
+        "statistical_models"
+      ]
+    },
+    {
+      "column": "open",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "high",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "low",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "close",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "volume",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "sma_20",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "ema_20",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "atr_14",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "macd",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "obv",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "vwap",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "mark_price",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    },
+    {
+      "column": "index_price",
+      "group": "raw_levels",
+      "role": "raw",
+      "transformer": false,
+      "sac": false,
+      "reason": "原始尺度供撮合或轉換，不直接當新版模型輸入",
+      "group_name": "原始價量與絕對指標",
+      "source_status": "原始碼有字串引用，未驗證數值管線",
+      "normalize": "先轉成比例或距離，新模型不直接使用",
+      "availability": "行情收盤或報價收到後",
+      "risk": "保留撮合資料不等於允許模型靠價格記憶時間",
+      "families": [
+        "trend",
+        "volume"
+      ]
+    }
+  ]
+}

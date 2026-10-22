@@ -1,0 +1,21 @@
+{
+  "scope": "明列來源的內容雜湊，不是第三方時間戳，不包含私人產物本體。",
+  "sources_sha256": {
+    "artifacts/reports/20261022/strategy_catalog_v2/catalog.json": "878b7c8b6e15d5baab0f7e57b34a26332eb80d622ddd66e4f15c680fd864a7e6",
+    "artifacts/reports/20261022/strategy_catalog_v2/features.json": "c39366bebc945a63dd6f8d434186acee4d8400ed99c63021f38e091c3c8f6c38",
+    "artifacts/reports/20261022/strategy_catalog_v2/catalog.md": "2b933917f806e1124aeae66b61a8aec84fd43bca43f96e622fd0bec06fc92e7a",
+    "artifacts/reports/20261022/strategy_catalog_v2/features.md": "0f3ac23ae5ae5217960498f164de04f77598175aa056a00560e1d2ca12402cfc",
+    "artifacts/reports/20261020/rule_factory_v1/delivery_001/all_backtests.csv": "e857fdadc4832cd03a1ecb600a0af6cd3ae41d2deea08d1ebb9d2c8ca88face7",
+    "docs/STRATEGY_FACTORY_PROTOCOL_20261020.md": "7c014ded1831460d54d16a31f1fc9f66a7303be01d056efda32240bf2dbe44bf",
+    "docs/PULLBACK_FOCUSED_PROTOCOL_20261019.md": "9a7f1cd94521f5ed959790fea325f7a98beba73d56890034fba38bd3e949a9d2"
+  },
+  "export_sha256": {
+    "feature_taxonomy.json": "1cb70961959a9d78889ce9f501ed5c855d8d57a3b00abe88234b29e13c86174f",
+    "feature_taxonomy.md": "3d2094b1d6b5a178baf171ae669dffb8b84e64ba07cbfe560ef08c11c91a2f91",
+    "pullback_protocol.md": "dd6fd811f0fc40c1630513d1373e9dac44b46c59efd1584d3dbf6457f8a6e37a",
+    "rule_factory_accounts.json": "58aeb09186b57d4261ebac27004e159e0f8f07420ec8a5acac452c2921e0ac8b",
+    "rule_factory_protocol.md": "f1905f5942e3ba49de841fa6f906f07073bd3e2627be16db35a46769a3d97850",
+    "strategy_catalog.json": "742ddd83b45b5b53d494b047463cdadc5fb09a0721459e2fb8e67c6eab5188ef",
+    "strategy_catalog.md": "cc2ae0ba7788afe6567bdac973635a2d0d0ac4100c018dc3b7027f5e98fab573"
+  }
+}

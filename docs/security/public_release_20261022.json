@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "SECURITY_REVIEW-20261022-RESEARCH",
+  "report_type": "release_quality",
+  "generated_at_utc": "2026-10-22T01:22:00Z",
+  "project": {"name": "AIQuantTradingSystem", "revision": "research_documentation_after_d43eca6", "environment": "公開研究文件與聚合快照；不修改交易程式"},
+  "scope": "有限策略研究方法、負面結果、策略與特徵分類的公開發布",
+  "overall_status": "WARN",
+  "summary": "公開邊界與聚合一致性驗證通過；研究未通過盈利品質閘門，實盤仍不具資格。",
+  "changes": [
+    "只發布白名單研究文件與去識別化模擬帳戶聚合指標。",
+    "保留45契約壓力成本全部負報酬等負面結果。",
+    "公開156策略目錄及41群210特徵名稱，不宣稱全部已實作。",
+    "固定研究快照換行，保留來源與輸出雜湊供重查。",
+    "不改訓練、交易、EXE或部署模型。"
+  ],
+  "findings": [
+    {"id":"SEC-001","severity":"INFO","status":"RESOLVED","category":"secret_scan","component":"aggregate_export","title":"研究識別碼欄名造成秘密掃描誤報","evidence":["首次Gitleaks暫存掃描304個generic-api-key，皆為模擬策略契約ID；改名strategy_id後零命中，未增加忽略規則"],"impact":"模糊的key欄名讓研究資料被誤判為憑證。","recommendation":"保留具體語意欄名及再次掃描。"},
+    {"id":"RES-001","severity":"HIGH","status":"OPEN","category":"research_quality","component":"rule_factory","title":"無候選通過研究品質閘門","evidence":["docs/RESEARCH_UPDATE_20261022.md","docs/research/20261022/rule_factory_accounts.json"],"impact":"不能升級Champion、啟動實盤或宣稱可盈利。","recommendation":"按預先限定假說與停止條件研究，不以增加搜尋量替代證據。"}
+  ],
+  "checks": [
+    {"id":"PUB-001","name":"公開邊界檢查","status":"PASS","evidence":["scripts/check_public_repository.py --staged；未發現私人檔案、非範例Email或個人Windows路徑"]},
+    {"id":"PUB-002","name":"研究快照與防洩漏測試","status":"PASS","evidence":["18 passed；tests/test_research_release_20261022.py + tests/test_public_repository_guard.py"]},
+    {"id":"PUB-003","name":"Gitleaks 8.30.1","status":"PASS","evidence":["下載檔案與官方checksums SHA256一致","redact模式暫存掃描零命中；既有18個commits掃描零命中","Git暫存樹匯出的完整5.73MB公開快照掃描零命中；該快照18項測試亦通過"]},
+    {"id":"PUB-004","name":"Ruff","status":"PASS","evidence":["新增公開研究驗證測試通過靜態檢查"]},
+    {"id":"LIVE-001","name":"實盤資格","status":"BLOCKED","evidence":["開發合格0；未啟動交易或改部署"]}
+  ],
+  "metrics": {"tests_passed":18,"rule_factory_accounts":456,"unique_contracts":45,"catalog_entries":156,"feature_groups":41,"feature_names":210,"active_features_added":0,"runtime_code_changed":false,"models_published":false,"raw_market_data_published":false,"live_eligible":false},
+  "artifacts": [
+    {"path":"docs/RESEARCH_UPDATE_20261022.md","role":"public_research_methods_and_results"},
+    {"path":"docs/research/20261022/provenance.json","role":"source_and_public_snapshot_hashes"}
+  ],
+  "residual_risks": ["零命中不等於絕對安全；未進行滲透測試或全面依賴漏洞稽核。","本次未重跑完整交易引擎或大型訓練。","未包含私人研究引擎與行情，因此不是完整一鍵回測重現套件。","歷史重複研究的多重選擇偏差仍存在。","GitHub Actions結果需在推送後另行核對。"],
+  "next_actions": ["推送前再次核對完整Git暫存快照。","推送後核對遠端commit SHA。","新假說需事前固定，沒有合格訊號就不重訓或部署。"]
+}
