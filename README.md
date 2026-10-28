@@ -7,7 +7,8 @@
 
 [English overview](README.en.md) · [五分鐘 Demo](docs/PUBLIC_DEMO.md) · [研究結果](docs/RESEARCH_RESULTS.md) · [系統架構](docs/ARCHITECTURE.md)
 
-最新研究：[有限策略實驗、成本後結果與156項研究目錄（2026-10-22）](docs/RESEARCH_UPDATE_20261022.md)。
+最新研究：[公開交易配對、成本完整性與研究資料契約（2026-10-29）](docs/RESEARCH_UPDATE_20261029.md)。
+前次研究：[有限策略實驗、成本後結果與156項研究目錄（2026-10-22）](docs/RESEARCH_UPDATE_20261022.md)。
 保留負面結果，沒有候選通過本輪品質閘門；目錄不代表已實作或可獲利策略。
 
 ![BTC AI Quant Research System](docs/assets/social-preview.png)

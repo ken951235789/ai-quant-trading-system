@@ -36,8 +36,8 @@ jobs:
       - name: Install public demo dependencies
         run: python -m pip install -e ".[dev]"
 
-      - name: Run public demo tests
-        run: python -m pytest -q tests/test_public_demo.py tests/test_public_repository_guard.py
+      - name: Run public demo and external research tests
+        run: python -m pytest -q tests/test_public_demo.py tests/test_public_repository_guard.py tests/research/test_external_traders.py tests/research/test_external_episodes.py
 
       - name: Smoke-test public demo
         run: ai-quant-demo --output outputs/public_demo_smoke --bars 360 --seed 11
