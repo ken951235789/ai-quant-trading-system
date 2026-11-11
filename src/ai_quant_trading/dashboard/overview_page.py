@@ -9,7 +9,6 @@ import streamlit as st
 
 from ai_quant_trading.dashboard.charts import make_candlestick_figure
 from ai_quant_trading.dashboard.services import (
-    ensure_chart_features,
     list_ohlcv_files,
     load_market_frame,
     relative_file_label,
@@ -17,6 +16,18 @@ from ai_quant_trading.dashboard.services import (
 from ai_quant_trading.dashboard.ui import themed_dataframe, themed_widget_key
 from ai_quant_trading.paper_trading import list_paper_accounts, load_account_state
 from ai_quant_trading.reinforcement_learning import list_rl_training_runs
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def load_overview_chart(path: str, modified_at_ns: int) -> pd.DataFrame:
+    """總覽只需要兩條均線，不在開啟頁面時計算整份訓練特徵。"""
+    # 保留 59 根暖機資料，使最後 1,000 根的 SMA60 與完整歷史計算一致。
+    frame = load_market_frame(path).tail(1_059).copy()
+    if frame.empty:
+        raise ValueError("圖表行情資料為空")
+    for window in (20, 60):
+        frame[f"sma_{window}"] = frame["close"].rolling(window, min_periods=window).mean()
+    return frame.tail(1_000).reset_index(drop=True)
 
 
 @st.cache_data(show_spinner=False)
@@ -160,7 +171,7 @@ def render_trading_overview_page(
             )
             selected_path = Path(str(watchlist.iloc[int(selected)]["檔案"]))
             try:
-                frame = ensure_chart_features(load_market_frame(selected_path))
+                frame = load_overview_chart(str(selected_path), selected_path.stat().st_mtime_ns)
                 maximum = min(len(frame), 1_000)
                 visible = st.slider(
                     "顯示 K 線",
